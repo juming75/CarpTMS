@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carptms-server
+  namespace: carptms
+  labels:
+    app: carptms-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: carptms-server
+  template:
+    metadata:
+      labels:
+        app: carptms-server
+    spec:
+      containers:
+      - name: carptms-server
+        image: carptms-server:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8082
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: database-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: jwt-secret
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: redis-url
+        - name: RUST_LOG
+          value: info
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /api/health/ready
+            port: 8082
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8082
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          failureThreshold: 6

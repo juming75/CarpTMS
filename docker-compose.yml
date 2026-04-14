@@ -1,0 +1,113 @@
+﻿﻿﻿﻿# CarpTMS 容器化部署配置
+# 包含 PostgreSQL、Redis、后端服务和前端服务
+
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: carptms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-carptms_password}
+      POSTGRES_DB: carptms_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./My_server/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - carptms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: carptms-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-carptms_redis}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - carptms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # 后端服务
+  backend:
+    build:
+      context: ./My_server
+      dockerfile: Dockerfile
+    container_name: carptms-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${DB_PASSWORD:-carptms_password}@postgres:5432/carptms_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-carptms_redis}@redis:6379
+      RUST_LOG: info
+      RUST_BACKTRACE: 1
+    ports:
+      - "8082:8082"
+      - "8988:8988"
+      - "9808:9808"
+      - "9809:9809"
+    networks:
+      - carptms-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./My_client
+      dockerfile: Dockerfile
+    container_name: carptms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - carptms-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 数据卷
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# 网络配置
+networks:
+  carptms-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+

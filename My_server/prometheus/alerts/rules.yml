@@ -1,0 +1,313 @@
+﻿# TMS 系统告警规则
+
+groups:
+  - name: tms_system_alerts
+    rules:
+      # API 错误率告警
+      - alert: ApiErrorRateHigh
+        expr: sum(rate(api_requests_total{status=~"5.."}[5m])) / sum(rate(api_requests_total[5m])) * 100 > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 错误率过高"
+          description: "API 错误率超过 5%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-api/api-dashboard"
+      
+      # API 请求延迟告警
+      - alert: ApiRequestDurationHigh
+        expr: histogram_quantile(0.95, sum(rate(api_request_duration_seconds_bucket[5m])) by (le, endpoint)) > 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 请求延迟过高"
+          description: "{{ $labels.endpoint }} 95% 请求延迟超过 2 秒，当前值: {{ $value | printf "%.2f" }}s"
+          dashboard_url: "http://localhost:3000/d/tms-api/api-dashboard"
+      
+      # 服务实例不健康告警
+      - alert: ServiceInstanceUnhealthy
+        expr: service_instances_unhealthy > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "服务实例不健康"
+          description: "有 {{ $value }} 个服务实例不健康"
+          dashboard_url: "http://localhost:3000/d/tms-service/service-dashboard"
+      
+      # 所有服务实例均不健康告警
+      - alert: AllServiceInstancesUnhealthy
+        expr: service_instances_healthy == 0 and service_instances_total > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "所有服务实例均不健康"
+          description: "所有服务实例均不健康，服务可能不可用"
+          dashboard_url: "http://localhost:3000/d/tms-service/service-dashboard"
+      
+      # 缓存命中率过低告警
+      - alert: CacheHitRateLow
+        expr: cache_hit_rate < 70
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "缓存命中率过低"
+          description: "缓存命中率低于 70%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-cache/cache-dashboard"
+      
+      # JWT 验证失败率过高告警
+      - alert: JwtValidationFailureRateHigh
+        expr: sum(rate(jwt_tokens_validated_total{result="failure"}[5m])) / sum(rate(jwt_tokens_validated_total[5m])) * 100 > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JWT 验证失败率过高"
+          description: "JWT 验证失败率超过 10%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-auth/authentication-dashboard"
+      
+      # 设备离线率过高告警
+      - alert: DeviceOfflineRateHigh
+        expr: (devices_offline / devices_total) * 100 > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "设备离线率过高"
+          description: "设备离线率超过 30%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-devices/device-dashboard"
+      
+      # 待处理订单数过多告警
+      - alert: PendingOrdersTooMany
+        expr: orders_pending > 100
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "待处理订单数过多"
+          description: "待处理订单数超过 100，当前值: {{ $value }}"
+          dashboard_url: "http://localhost:3000/d/tms-orders/order-dashboard"
+      
+      # WebSocket 连接数异常告警
+      - alert: WebSocketConnectionsAbnormal
+        expr: websocket_connections > 500
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket 连接数异常"
+          description: "WebSocket 连接数超过 500，当前值: {{ $value }}"
+          dashboard_url: "http://localhost:3000/d/tms-websocket/websocket-dashboard"
+      
+      # 称重数据增长异常告警
+      - alert: WeighingDataGrowthAbnormal
+        expr: increase(weighing_data_total[1h]) > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "称重数据增长异常"
+          description: "1 小时内称重数据增长超过 1000 条，当前值: {{ $value }}"
+          dashboard_url: "http://localhost:3000/d/tms-weighing/weighing-dashboard"
+      
+      # 车辆在线率过低告警
+      - alert: VehicleOnlineRateLow
+        expr: (vehicles_online / vehicles_total) * 100 < 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "车辆在线率过低"
+          description: "车辆在线率低于 60%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-vehicles/vehicle-dashboard"
+
+  - name: database_alerts
+    rules:
+      # 数据库连接使用率告警
+      - alert: DatabaseConnectionsUsageHigh
+        expr: (db_connections_in_use / db_connections_total) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库连接使用率过高"
+          description: "数据库连接使用率超过 80%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-db/database-dashboard"
+      
+      # 数据库查询执行时间过长告警
+      - alert: DatabaseQueryDurationHigh
+        expr: db_query_duration_seconds > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库查询执行时间过长"
+          description: "数据库查询执行时间超过 5 秒，当前值: {{ $value | printf "%.2f" }}s"
+          dashboard_url: "http://localhost:3000/d/tms-db/database-dashboard"
+      
+      # 数据库复制延迟告警
+      - alert: DatabaseReplicationLag
+        expr: pg_replication_lag > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库复制延迟"
+          description: "数据库复制延迟超过 60 秒，当前值: {{ $value }}s"
+          dashboard_url: "http://localhost:3000/d/tms-db/database-dashboard"
+      
+      # 数据库备份失败告警
+      - alert: DatabaseBackupFailed
+        expr: db_backup_status == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "数据库备份失败"
+          description: "数据库备份失败，需要检查备份配置"
+          dashboard_url: "http://localhost:3000/d/tms-db/database-dashboard"
+
+  - name: redis_alerts
+    rules:
+      # Redis 内存使用率告警
+      - alert: RedisMemoryUsageHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 内存使用率过高"
+          description: "Redis 内存使用率超过 80%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-redis/redis-dashboard"
+      
+      # Redis 连接数告警
+      - alert: RedisConnectionsHigh
+        expr: redis_connected_clients > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 连接数过高"
+          description: "Redis 连接数超过 1000，当前值: {{ $value }}"
+          dashboard_url: "http://localhost:3000/d/tms-redis/redis-dashboard"
+      
+      # Redis 集群节点不健康告警
+      - alert: RedisClusterNodeUnhealthy
+        expr: redis_cluster_nodes_unhealthy > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 集群节点不健康"
+          description: "有 {{ $value }} 个 Redis 集群节点不健康"
+          dashboard_url: "http://localhost:3000/d/tms-redis/redis-dashboard"
+
+  - name: system_alerts
+    rules:
+      # CPU 使用率告警
+      - alert: CpuUsageHigh
+        expr: cpu_usage_percentage > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU 使用率过高"
+          description: "CPU 使用率超过 80%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-system/system-dashboard"
+      
+      # 内存使用率告警
+      - alert: MemoryUsageHigh
+        expr: memory_usage_percentage > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高"
+          description: "内存使用率超过 85%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-system/system-dashboard"
+      
+      # 磁盘使用率告警
+      - alert: DiskUsageHigh
+        expr: disk_usage_percentage > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘使用率过高"
+          description: "磁盘使用率超过 90%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-system/system-dashboard"
+      
+      # 网络流量异常告警
+      - alert: NetworkTrafficAbnormal
+        expr: network_receive_bytes_total > 1000000000 or network_transmit_bytes_total > 1000000000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "网络流量异常"
+          description: "网络流量异常，当前接收: {{ $value }} bytes"
+          dashboard_url: "http://localhost:3000/d/tms-system/system-dashboard"
+
+  - name: nginx_alerts
+    rules:
+      # Nginx 错误率告警
+      - alert: NginxErrorRateHigh
+        expr: sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) * 100 > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx 错误率过高"
+          description: "Nginx 错误率超过 5%，当前值: {{ $value | printf "%.2f" }}%"
+          dashboard_url: "http://localhost:3000/d/tms-nginx/nginx-dashboard"
+      
+      # Nginx 连接数告警
+      - alert: NginxConnectionsHigh
+        expr: nginx_connections_active > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx 连接数过高"
+          description: "Nginx 活跃连接数超过 1000，当前值: {{ $value }}"
+          dashboard_url: "http://localhost:3000/d/tms-nginx/nginx-dashboard"
+
+  - name: blue_green_alerts
+    rules:
+      # 蓝色环境不健康告警
+      - alert: BlueEnvironmentUnhealthy
+        expr: up{job="tms_server_blue"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "蓝色环境不健康"
+          description: "蓝色环境服务实例不健康"
+          dashboard_url: "http://localhost:3000/d/tms-blue-green/blue-green-dashboard"
+      
+      # 绿色环境不健康告警
+      - alert: GreenEnvironmentUnhealthy
+        expr: up{job="tms_server_green"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "绿色环境不健康"
+          description: "绿色环境服务实例不健康"
+          dashboard_url: "http://localhost:3000/d/tms-blue-green/blue-green-dashboard"
+      
+      # 蓝绿环境均不健康告警
+      - alert: BothEnvironmentsUnhealthy
+        expr: up{job="tms_server_blue"} == 0 and up{job="tms_server_green"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "蓝绿环境均不健康"
+          description: "蓝绿环境服务实例均不健康，服务可能不可用"
+          dashboard_url: "http://localhost:3000/d/tms-blue-green/blue-green-dashboard"
+
+

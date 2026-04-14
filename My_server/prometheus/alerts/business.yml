@@ -1,0 +1,131 @@
+# 业务告警规则
+groups:
+  - name: business_metrics
+    interval: 60s
+    rules:
+      # 订单量异常下降
+      - alert: OrderVolumeDrop
+        expr: rate(orders_created_total[1h]) < 0.5 * rate(orders_created_total[1h] offset 1d)
+        for: 30m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "订单量异常下降"
+          description: "过去1小时的订单量相比昨天同期下降超过50%"
+
+      # 称重数据异常
+      - alert: WeighingDataAnomaly
+        expr: rate(weighing_records_total[1h]) < 0.3 * rate(weighing_records_total[1h] offset 1d)
+        for: 30m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "称重数据异常"
+          description: "过去1小时的称重记录相比昨天同期下降超过70%"
+
+      # 车辆离线率过高
+      - alert: VehicleOfflineRateHigh
+        expr: (count(vehicle_status{status="offline"}) / count(vehicle_status)) > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "车辆离线率过高"
+          description: "超过20%的车辆处于离线状态"
+
+      # 设备故障率过高
+      - alert: DeviceFailureRateHigh
+        expr: rate(device_failures_total[1h]) > 0.1
+        for: 15m
+        labels:
+          severity: critical
+          category: business
+        annotations:
+          summary: "设备故障率过高"
+          description: "过去1小时设备故障率超过10%"
+
+      # 财务数据异常
+      - alert: FinancialDataAnomaly
+        expr: abs(rate(financial_transactions_total[1h]) - rate(financial_transactions_total[1h] offset 1d)) / rate(financial_transactions_total[1h] offset 1d) > 0.5
+        for: 30m
+        labels:
+          severity: warning
+          category: business
+        annotations:
+          summary: "财务数据异常"
+          description: "财务交易数据相比昨天同期波动超过50%"
+
+  - name: security_alerts
+    interval: 60s
+    rules:
+      # 异常登录尝试
+      - alert: AbnormalLoginAttempts
+        expr: rate(login_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "异常登录尝试"
+          description: "过去5分钟内登录失败次数超过10次，可能存在暴力破解攻击"
+
+      # 未授权访问
+      - alert: UnauthorizedAccess
+        expr: rate(unauthorized_access_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "未授权访问"
+          description: "过去5分钟内未授权访问次数超过5次"
+
+      # API异常调用
+      - alert: APIAbnormalCalls
+        expr: rate(api_suspicious_calls_total[5m]) > 20
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "API异常调用"
+          description: "过去5分钟内API异常调用次数超过20次"
+
+  - name: sla_alerts
+    interval: 60s
+    rules:
+      # SLA违反 - 可用性
+      - alert: SLAAvailabilityViolation
+        expr: avg_over_time(up{job=~".*-service"}[1h]) < 0.995
+        for: 5m
+        labels:
+          severity: critical
+          category: sla
+        annotations:
+          summary: "SLA可用性违反"
+          description: "服务 {{ $labels.service }} 的1小时可用性低于99.5%"
+
+      # SLA违反 - 响应时间
+      - alert: SLALatencyViolation
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=~".*-service"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          category: sla
+        annotations:
+          summary: "SLA响应时间违反"
+          description: "服务 {{ $labels.service }} 的99分位响应时间超过1秒"
+
+      # SLA违反 - 错误率
+      - alert: SLAErrorRateViolation
+        expr: rate(http_requests_total{job=~".*-service",status=~"5.."}[5m]) / rate(http_requests_total{job=~".*-service"}[5m]) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          category: sla
+        annotations:
+          summary: "SLA错误率违反"
+          description: "服务 {{ $labels.service }} 的错误率超过0.1%"

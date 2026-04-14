@@ -1,0 +1,77 @@
+﻿{
+  "version": "1.0",
+  "sync_enabled": true,
+  "sync_interval": 300,
+  "database_config": {
+    "postgresql": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "tms_db",
+      "username": "postgres",
+      "password": "123",
+      "ssl_mode": "disable"
+    },
+    "sqlite": {
+      "database_file": "tms_cache.db",
+      "version": 3
+    }
+  },
+  "table_mappings": [
+    {
+      "source": "vehicles",
+      "target": "local_vehicles",
+      "direction": "bidirectional",
+      "primary_key": "vehicle_id",
+      "server_id_field": "server_id",
+      "sync_fields": ["vehicle_name", "device_id", "own_no", "own_name", "own_phone", "group_id", "update_time"],
+      "last_sync_field": "sync_time",
+      "is_synced_field": "is_synced"
+    },
+    {
+      "source": "weighing_data",
+      "target": "local_weighing_data",
+      "direction": "bidirectional",
+      "primary_key": "id",
+      "server_id_field": "server_id",
+      "sync_fields": ["vehicle_id", "device_id", "weighing_time", "gross_weight", "tare_weight", "net_weight", "axle_count", "speed", "lane_no", "site_id", "status", "update_time"],
+      "last_sync_field": "sync_time",
+      "is_synced_field": "is_synced"
+    },
+    {
+      "source": "report_templates",
+      "target": "local_report_templates",
+      "direction": "server_to_client",
+      "primary_key": "id",
+      "server_id_field": "server_id",
+      "sync_fields": ["name", "type", "config", "is_default", "create_user_id", "update_time"],
+      "last_sync_field": "sync_time"
+    },
+    {
+      "source": "report_data",
+      "target": "local_report_data",
+      "direction": "server_to_client",
+      "primary_key": "id",
+      "server_id_field": "server_id",
+      "sync_fields": ["template_id", "report_time", "period_type", "period_value", "data", "status", "update_time"],
+      "last_sync_field": "sync_time",
+      "is_synced_field": "is_synced"
+    }
+  ],
+  "sync_strategy": {
+    "initial_sync": "full",
+    "incremental_sync": "time_based",
+    "conflict_resolution": "server_wins",
+    "batch_size": 100,
+    "retry_count": 3,
+    "retry_delay": 5000
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "log_file": "sync_logs.log",
+    "max_file_size": 10485760,
+    "max_backup_count": 5
+  }
+}
+
+

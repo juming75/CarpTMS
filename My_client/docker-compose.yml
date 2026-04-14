@@ -1,0 +1,34 @@
+﻿version: '3.8'
+
+services:
+  # 前端Web服务
+  web:
+    build: .
+    container_name: tms_client_web
+    ports:
+      - '80:80'
+    networks:
+      - tms_network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+# 定义网络
+networks:
+  tms_network:
+    driver: bridge
+    external:
+      name: my_server_tms_network
+
+

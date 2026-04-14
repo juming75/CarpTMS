@@ -1,0 +1,74 @@
+# 微服务架构配置
+architecture:
+  mode: micro_ddd
+  enable_service_discovery: true
+  enable_distributed_tracing: true
+  enable_event_driven: true
+  persist_domain_events: true
+  bounded_contexts:
+    - name: transportation
+      description: 运输管理上下文
+      aggregates: ["Vehicle", "Driver", "Trip"]
+      domain_services: ["VehicleService", "TripService"]
+      application_services: ["TransportationAppService"]
+    - name: cargo
+      description: 货物管理上下文
+      aggregates: ["Cargo", "Container"]
+      domain_services: ["CargoService"]
+      application_services: ["CargoAppService"]
+    - name: billing
+      description: 计费管理上下文
+      aggregates: ["Invoice", "Payment"]
+      domain_services: ["BillingService"]
+      application_services: ["BillingAppService"]
+  microservices:
+    - name: vehicle-service
+      host: 0.0.0.0
+      port: 8083
+      health_check_path: /api/health
+      tags: ["vehicle", "transportation"]
+    - name: cargo-service
+      host: 0.0.0.0
+      port: 8084
+      health_check_path: /api/health
+      tags: ["cargo"]
+    - name: trip-service
+      host: 0.0.0.0
+      port: 8085
+      health_check_path: /api/health
+      tags: ["trip", "transportation"]
+    - name: billing-service
+      host: 0.0.0.0
+      port: 8086
+      health_check_path: /api/health
+      tags: ["billing"]
+    - name: user-service
+      host: 0.0.0.0
+      port: 8087
+      health_check_path: /api/health
+      tags: ["user", "auth"]
+    - name: device-service
+      host: 0.0.0.0
+      port: 8088
+      health_check_path: /api/health
+      tags: ["device"]
+    - name: finance-service
+      host: 0.0.0.0
+      port: 8089
+      health_check_path: /api/health
+      tags: ["finance"]
+    - name: location-service
+      host: 0.0.0.0
+      port: 8090
+      health_check_path: /api/health
+      tags: ["location"]
+    - name: weighing-service
+      host: 0.0.0.0
+      port: 8091
+      health_check_path: /api/health
+      tags: ["weighing"]
+    - name: alerts-service
+      host: 0.0.0.0
+      port: 8092
+      health_check_path: /api/health
+      tags: ["alerts"]

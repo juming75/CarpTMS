@@ -1,0 +1,145 @@
+# 基础设施告警规则
+groups:
+  - name: infrastructure_health
+    interval: 15s
+    rules:
+      # 节点宕机
+      - alert: NodeDown
+        expr: up{job="node"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "节点 {{ $labels.instance }} 宕机"
+          description: "节点 {{ $labels.instance }} 已经宕机超过1分钟"
+
+      # 磁盘空间不足
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+          category: storage
+        annotations:
+          summary: "磁盘空间不足"
+          description: "节点 {{ $labels.instance }} 的根分区剩余空间不足10%"
+
+      # 内存不足
+      - alert: MemoryLow
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+          category: memory
+        annotations:
+          summary: "内存不足"
+          description: "节点 {{ $labels.instance }} 的可用内存不足10%"
+
+      # CPU使用率过高
+      - alert: CPUHighUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: cpu
+        annotations:
+          summary: "CPU使用率过高"
+          description: "节点 {{ $labels.instance }} 的CPU使用率超过90%"
+
+  - name: database_health
+    interval: 30s
+    rules:
+      # PostgreSQL主库宕机
+      - alert: PostgreSQLMasterDown
+        expr: pg_up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "PostgreSQL主库宕机"
+          description: "PostgreSQL主库无法访问"
+
+      # PostgreSQL连接数过高
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "PostgreSQL连接数过高"
+          description: "PostgreSQL的连接数超过最大连接数的80%"
+
+      # PostgreSQL复制延迟
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag > 300
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "PostgreSQL复制延迟"
+          description: "PostgreSQL从库的复制延迟超过5分钟"
+
+  - name: cache_health
+    interval: 30s
+    rules:
+      # Redis宕机
+      - alert: RedisDown
+        expr: redis_up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: cache
+        annotations:
+          summary: "Redis宕机"
+          description: "Redis服务器无法访问"
+
+      # Redis内存使用过高
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: cache
+        annotations:
+          summary: "Redis内存使用过高"
+          description: "Redis的内存使用率超过90%"
+
+      # Redis连接数过高
+      - alert: RedisHighConnections
+        expr: redis_connected_clients / redis_config_maxclients > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: cache
+        annotations:
+          summary: "Redis连接数过高"
+          description: "Redis的连接数超过最大连接数的80%"
+
+  - name: network_health
+    interval: 30s
+    rules:
+      # 网络丢包率高
+      - alert: NetworkHighPacketLoss
+        expr: rate(node_network_receive_drop_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "网络丢包率高"
+          description: "节点 {{ $labels.instance }} 的网络丢包率超过1%"
+
+      # 网络延迟高
+      - alert: NetworkHighLatency
+        expr: node_network_receive_errs_total > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "网络错误率高"
+          description: "节点 {{ $labels.instance }} 的网络接收错误数超过100"

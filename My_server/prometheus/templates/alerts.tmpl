@@ -1,0 +1,234 @@
+﻿{{/* 电子邮件主题模板 */}}
+{{ define "email.subject" }}
+{{ .CommonLabels.alertname }} - {{ .CommonLabels.severity | toUpper }}
+{{ end }}
+
+{{/* 电子邮件HTML模板 */}}
+{{ define "email.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ template "email.subject" . }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: {{ if eq .CommonLabels.severity "critical" }}#dc3545{{ else if eq .CommonLabels.severity "warning" }}#ffc107{{ else }}#6c757d{{ end }};
+            color: white;
+            padding: 15px;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .alert {
+            background-color: white;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid {{ if eq .CommonLabels.severity "critical" }}#dc3545{{ else if eq .CommonLabels.severity "warning" }}#ffc107{{ else }}#6c757d{{ end }};
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .alert-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .alert-labels {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .alert-value {
+            font-family: monospace;
+            background-color: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.8em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>{{ template "email.subject" . }}</h2>
+    </div>
+    <div class="content">
+        {{ if gt (len .Alerts.Firing) 0 }}
+        <h3>🔥 正在触发的告警 ({{ len .Alerts.Firing }})</h3>
+        {{ range .Alerts.Firing }}
+        <div class="alert">
+            <div class="alert-title">{{ .Annotations.summary }}</div>
+            <div>{{ .Annotations.description }}</div>
+            {{ if .Annotations.dashboard_url }}
+            <div style="margin-top: 10px;">
+                <a href="{{ .Annotations.dashboard_url }}" target="_blank">查看仪表盘</a>
+            </div>
+            {{ end }}
+            <div class="alert-labels">
+                <strong>标签:</strong> {{ range .Labels }}{{ .Name }}={{ .Value }} {{ end }}
+            </div>
+            <div class="alert-labels">
+                <strong>值:</strong> <span class="alert-value">{{ .Value }}</span>
+            </div>
+        </div>
+        {{ end }}
+        {{ end }}
+        
+        {{ if gt (len .Alerts.Resolved) 0 }}
+        <h3>✅ 已解决的告警 ({{ len .Alerts.Resolved }})</h3>
+        {{ range .Alerts.Resolved }}
+        <div class="alert">
+            <div class="alert-title">{{ .Annotations.summary }}</div>
+            <div>{{ .Annotations.description }}</div>
+            {{ if .Annotations.dashboard_url }}
+            <div style="margin-top: 10px;">
+                <a href="{{ .Annotations.dashboard_url }}" target="_blank">查看仪表盘</a>
+            </div>
+            {{ end }}
+        </div>
+        {{ end }}
+        {{ end }}
+        
+        <div class="footer">
+            <p>此邮件由 Alertmanager 自动发送，请勿直接回复。</p>
+            <p>时间: {{ now.Format "2006-01-02 15:04:05" }}</p>
+        </div>
+    </div>
+</body>
+</html>
+{{ end }}
+
+{{/* Slack消息模板 */}}
+{{ define "slack.text" }}
+{{ if gt (len .Alerts.Firing) 0 }}
+{{ range .Alerts.Firing }}
+*{{ if eq .Labels.severity "critical" }}🔥 CRITICAL{{ else if eq .Labels.severity "warning" }}⚠️ WARNING{{ else }}ℹ️ INFO{{ end }}: {{ .Annotations.summary }}*
+
+{{ .Annotations.description }}
+
+{{ if .Annotations.dashboard_url }}
+<{{ .Annotations.dashboard_url }}|查看仪表盘>
+{{ end }}
+
+*标签:*
+{{ range .Labels }}
+• {{ .Name }}: {{ .Value }}
+{{ end }}
+
+*值:* `{{ .Value }}`
+{{ end }}
+{{ end }}
+
+{{ if gt (len .Alerts.Resolved) 0 }}
+✅ *已解决的告警:*
+{{ range .Alerts.Resolved }}
+• {{ .Annotations.summary }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{/* 微信消息模板 */}}
+{{ define "wechat.message" }}
+{{ if gt (len .Alerts.Firing) 0 }}
+{{ range .Alerts.Firing }}
+{{ if eq .Labels.severity "critical" }}【紧急】{{ else if eq .Labels.severity "warning" }}【警告】{{ else }}【信息】{{ end }}{{ .Annotations.summary }}
+
+{{ .Annotations.description }}
+
+标签:
+{{ range .Labels }}
+{{ .Name }}: {{ .Value }}
+{{ end }}
+
+值: {{ .Value }}
+
+{{ if .Annotations.dashboard_url }}
+仪表盘: {{ .Annotations.dashboard_url }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{ if gt (len .Alerts.Resolved) 0 }}
+【已解决】
+{{ range .Alerts.Resolved }}
+{{ .Annotations.summary }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{/* Webhook消息模板 */}}
+{{ define "webhook.json" }}
+{
+  "alerts": {
+    "firing": [
+      {{ range $index, $alert := .Alerts.Firing }}
+      {
+        "status": "{{ $alert.Status }}",
+        "labels": {
+          {{ range $label := $alert.Labels }}
+          "{{ $label.Name }}": "{{ $label.Value }}"{{ if not (last $index $alert.Labels) }},{{ end }}
+          {{ end }}
+        },
+        "annotations": {
+          {{ range $annotation := $alert.Annotations }}
+          "{{ $annotation.Name }}": "{{ $annotation.Value }}"{{ if not (last $index $alert.Annotations) }},{{ end }}
+          {{ end }}
+        },
+        "value": "{{ $alert.Value }}",
+        "startsAt": "{{ $alert.StartsAt }}"
+      }{{ if not (last $index $.Alerts.Firing) }},{{ end }}
+      {{ end }}
+    ],
+    "resolved": [
+      {{ range $index, $alert := .Alerts.Resolved }}
+      {
+        "status": "{{ $alert.Status }}",
+        "labels": {
+          {{ range $label := $alert.Labels }}
+          "{{ $label.Name }}": "{{ $label.Value }}"{{ if not (last $index $alert.Labels) }},{{ end }}
+          {{ end }}
+        },
+        "annotations": {
+          {{ range $annotation := $alert.Annotations }}
+          "{{ $annotation.Name }}": "{{ $annotation.Value }}"{{ if not (last $index $alert.Annotations) }},{{ end }}
+          {{ end }}
+        },
+        "value": "{{ $alert.Value }}",
+        "startsAt": "{{ $alert.StartsAt }}",
+        "endsAt": "{{ $alert.EndsAt }}"
+      }{{ if not (last $index $.Alerts.Resolved) }},{{ end }}
+      {{ end }}
+    ]
+  },
+  "commonLabels": {
+    {{ range $label := .CommonLabels }}
+    "{{ $label.Name }}": "{{ $label.Value }}"{{ if not (last $index $.CommonLabels) }},{{ end }}
+    {{ end }}
+  },
+  "groupLabels": {
+    {{ range $label := .GroupLabels }}
+    "{{ $label.Name }}": "{{ $label.Value }}"{{ if not (last $index $.GroupLabels) }},{{ end }}
+    {{ end }}
+  },
+  "status": "{{ .Status }}",
+  "externalURL": "{{ .ExternalURL }}",
+  "version": "{{ .Version }}"
+}
+{{ end }}
+
