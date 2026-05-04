@@ -1,0 +1,121 @@
+# 微服务架构告警规则
+groups:
+  - name: microservices_health
+    interval: 15s
+    rules:
+      # 微服务宕机告警
+      - alert: MicroserviceDown
+        expr: up{job=~".*-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "微服务 {{ $labels.service }} 宕机"
+          description: "微服务 {{ $labels.service }} 已经宕机超过1分钟"
+          runbook_url: "https://wiki.carptms.com/runbooks/microservice-down"
+
+      # 微服务响应时间过长
+      - alert: MicroserviceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~".*-service"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "微服务 {{ $labels.service }} 响应时间过长"
+          description: "微服务 {{ $labels.service }} 的95分位响应时间超过500ms"
+
+      # 微服务错误率过高
+      - alert: MicroserviceHighErrorRate
+        expr: rate(http_requests_total{job=~".*-service",status=~"5.."}[5m]) / rate(http_requests_total{job=~".*-service"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: reliability
+        annotations:
+          summary: "微服务 {{ $labels.service }} 错误率过高"
+          description: "微服务 {{ $labels.service }} 的错误率超过5%"
+
+      # 微服务请求量异常
+      - alert: MicroserviceLowRequestRate
+        expr: rate(http_requests_total{job=~".*-service"}[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          category: traffic
+        annotations:
+          summary: "微服务 {{ $labels.service }} 请求量异常低"
+          description: "微服务 {{ $labels.service }} 的请求量异常低，可能存在流量问题"
+
+  - name: microservices_resources
+    interval: 30s
+    rules:
+      # 微服务内存使用过高
+      - alert: MicroserviceHighMemoryUsage
+        expr: process_resident_memory_bytes{job=~".*-service"} / 1024 / 1024 > 512
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "微服务 {{ $labels.service }} 内存使用过高"
+          description: "微服务 {{ $labels.service }} 的内存使用超过512MB"
+
+      # 微服务CPU使用过高
+      - alert: MicroserviceHighCPUUsage
+        expr: rate(process_cpu_seconds_total{job=~".*-service"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "微服务 {{ $labels.service }} CPU使用过高"
+          description: "微服务 {{ $labels.service }} 的CPU使用率超过80%"
+
+      # 微服务goroutine泄漏
+      - alert: MicroserviceGoroutineLeak
+        expr: go_goroutines{job=~".*-service"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "微服务 {{ $labels.service }} Goroutine数量异常"
+          description: "微服务 {{ $labels.service }} 的Goroutine数量超过1000，可能存在泄漏"
+
+  - name: service_dependencies
+    interval: 30s
+    rules:
+      # 数据库连接池耗尽
+      - alert: DatabaseConnectionPoolExhausted
+        expr: db_connections_active / db_connections_max > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "数据库连接池即将耗尽"
+          description: "数据库连接池使用率超过90%"
+
+      # Redis连接异常
+      - alert: RedisConnectionError
+        expr: redis_connected_clients == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: cache
+        annotations:
+          summary: "Redis连接异常"
+          description: "无法连接到Redis服务器"
+
+      # 服务间调用失败
+      - alert: ServiceCallFailure
+        expr: rate(service_call_failures_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          category: dependencies
+        annotations:
+          summary: "服务间调用失败率过高"
+          description: "服务间调用失败率超过10%"

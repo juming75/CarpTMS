@@ -1,0 +1,249 @@
+# CarpTMS Helm Chart
+
+apiVersion: v2
+name: carptms
+description: CarpTMS 车联网运输管理系统 Helm Chart
+type: application
+version: 1.1.0
+appVersion: "1.1.0"
+keywords:
+  - carptms
+  - transportation
+  - fleet-management
+  - iot
+maintainers:
+  - name: CarpTMS Team
+    email: support@carptms.com
+
+# 依赖项
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+  - name: prometheus
+    version: "25.x.x"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+
+---
+
+# 默认配置
+env:
+  # 数据库配置
+  DATABASE_URL: ""
+  DATABASE_POOL_MIN: "10"
+  DATABASE_POOL_MAX: "100"
+
+  # Redis 配置
+  REDIS_URL: ""
+
+  # JWT 配置
+  JWT_SECRET: ""
+  JWT_EXPIRATION: "86400"
+
+  # 服务配置
+  RUST_LOG: "info"
+  SERVER_PORT: "8082"
+  SERVER_WORKERS: "4"
+
+  # AI 配置 (可选)
+  ENABLE_AI: "true"
+  AI_MODEL_PATH: "/models"
+
+  # 监控配置
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "8988"
+
+  # 日志配置
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+resources:
+  limits:
+    cpu: "2000m"
+    memory: "4Gi"
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+
+# 副本配置
+replicaCount: 3
+
+# 自动扩缩容配置
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# 健康检查配置
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8082
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 8082
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# 持久化配置
+persistence:
+  enabled: true
+  storageClass: "standard-ssd"
+  size: "50Gi"
+  mountPath: "/data"
+
+# 监控配置
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+  prometheusRule:
+    enabled: true
+
+# 告警配置
+alerts:
+  enabled: true
+  groups:
+    - name: carptms.rules
+      rules:
+        - alert: CarpTMSServerDown
+          expr: up{job="carptms"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CarpTMS Server 实例不可用"
+            description: "CarpTMS Server 已经宕机超过 1 分钟"
+
+        - alert: HighErrorRate
+          expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "HTTP 错误率过高"
+            description: "5分钟内 HTTP 5xx 错误率超过 5%"
+
+        - alert: HighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "请求延迟过高"
+            description: "P95 延迟超过 2 秒"
+
+        - alert: DatabaseConnectionHigh
+          expr: database_pool_size / database_pool_max > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "数据库连接池使用率过高"
+            description: "数据库连接池使用率超过 80%"
+
+        - alert: CacheHitRateLow
+          expr: cache_hits / (cache_hits + cache_misses) < 0.7
+          for: 10m
+          labels:
+            severity: info
+          annotations:
+            summary: "缓存命中率低"
+            description: "缓存命中率低于 70%"
+
+# 备份配置
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # 每天凌晨2点
+  retention: 7
+  destination: "s3://carptms-backup"
+
+# 安全配置
+security:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+  seLinuxOptions:
+    level: "s0:c123,c456"
+
+# 网络配置
+network:
+  port: 8082
+  metricsPort: 8988
+  grpcPort: 9808
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+  maxUnavailable: 1
+
+# 亲和性配置
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - carptms
+          topologyKey: kubernetes.io/hostname
+
+# 节点选择器
+nodeSelector:
+  workload-type: backend
+
+# 容忍配置
+tolerations:
+  - key: "dedicated"
+    operator: "Equal"
+    value: "backend"
+    effect: "NoSchedule"
+
+# 服务账户配置
+serviceAccount:
+  create: true
+  name: carptms
+  annotations:
+    iam.gke.io/gcp-service-account: carptms@project.iam.gserviceaccount.com
+
+# Ingress 配置
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    - host: api.carptms.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: carptms-tls
+      hosts:
+        - api.carptms.com

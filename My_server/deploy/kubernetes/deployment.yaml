@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carptms-server
+  namespace: carptms
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: carptms-server
+  template:
+    metadata:
+      labels:
+        app: carptms-server
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: carptms-server
+        image: carptms/server:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: database-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: jwt-secret
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: carptms-secrets
+              key: redis-url
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1
+            memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: carptms-server
+  namespace: carptms
+spec:
+  selector:
+    app: carptms-server
+  ports:
+  - port: 8082
+    targetPort: 8082
+  type: ClusterIP
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: carptms-server
+  namespace: carptms
+spec:
+  hosts:
+  - carptms.example.com
+  gateways:
+  - carptms-gateway
+  http:
+  - route:
+    - destination:
+        host: carptms-server
+        port:
+          number: 8082
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: carptms-gateway
+  namespace: carptms
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - carptms.example.com
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      serverCertificates:
+      - secretName: carptms-tls
+    hosts:
+    - carptms.example.com

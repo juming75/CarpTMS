@@ -1,0 +1,165 @@
+﻿groups:
+- name: carptms_system_alerts
+  rules:
+  - alert: HighCPUUsage
+    expr: carptms_system_cpu_usage_percent > 85
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "高CPU使用率告警"
+      description: "系统CPU使用率超过85%，当前值: {{ $value }}%"
+
+  - alert: HighMemoryUsage
+    expr: carptms_system_memory_usage_percent > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "高内存使用率告警"
+      description: "系统内存使用率超过80%，当前值: {{ $value }}%"
+
+  - alert: CriticalMemoryUsage
+    expr: carptms_system_memory_usage_percent > 90
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "严重内存不足告警"
+      description: "系统内存使用率超过90%，当前值: {{ $value }}%"
+
+  - alert: HighDiskUsage
+    expr: carptms_system_disk_usage_percent > 85
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "高磁盘使用率告警"
+      description: "系统磁盘使用率超过85%，当前值: {{ $value }}%"
+
+- name: carptms_api_alerts
+  rules:
+  - alert: HighErrorRate
+    expr: rate(carptms_errors_total[5m]) / rate(carptms_requests_total[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "API错误率过高告警"
+      description: "API错误率超过5%，当前值: {{ $value | humanizePercentage }}"
+
+  - alert: CriticalErrorRate
+    expr: rate(carptms_errors_total[5m]) / rate(carptms_requests_total[5m]) > 0.1
+    for: 3m
+    labels:
+      severity: critical
+    annotations:
+      summary: "API错误率严重过高告警"
+      description: "API错误率超过10%，当前值: {{ $value | humanizePercentage }}"
+
+  - alert: HighRequestLatency
+    expr: histogram_quantile(0.95, sum(rate(carptms_request_duration_seconds_bucket[5m])) by (le)) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "API请求延迟过高告警"
+      description: "95%的API请求延迟超过1秒，当前值: {{ $value }}秒"
+
+  - alert: CriticalRequestLatency
+    expr: histogram_quantile(0.95, sum(rate(carptms_request_duration_seconds_bucket[5m])) by (le)) > 3
+    for: 3m
+    labels:
+      severity: critical
+    annotations:
+      summary: "API请求延迟严重过高告警"
+      description: "95%的API请求延迟超过3秒，当前值: {{ $value }}秒"
+
+  - alert: TooManyActiveRequests
+    expr: carptms_active_requests > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "活跃请求数过多告警"
+      description: "系统活跃请求数超过100，当前值: {{ $value }}"
+
+- name: carptms_business_alerts
+  rules:
+  - alert: NoOrdersProcessed
+    expr: rate(carptms_business_orders_processed_total[1h]) < 1
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "订单处理异常告警"
+      description: "过去1小时内订单处理量过低，当前值: {{ $value }}"
+
+  - alert: LowVehicleActivity
+    expr: carptms_business_vehicles_active < 5
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "车辆活跃度低告警"
+      description: "系统活跃车辆数低于5，当前值: {{ $value }}"
+
+  - alert: LowDeviceOnline
+    expr: carptms_business_devices_online < 10
+    for: 1h
+    labels:
+      severity: warning
+    annotations:
+      summary: "在线设备数过低告警"
+      description: "系统在线设备数低于10，当前值: {{ $value }}"
+
+  - alert: NoWeighingData
+    expr: rate(carptms_business_weighing_data_total[1h]) < 1
+    for: 2h
+    labels:
+      severity: warning
+    annotations:
+      summary: "称重数据异常告警"
+      description: "过去2小时内没有称重数据记录，当前值: {{ $value }}"
+
+- name: carptms_websocket_alerts
+  rules:
+  - alert: WebSocketConnectionDropped
+    expr: carptms_websocket_connections < 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "WebSocket连接异常告警"
+      description: "WebSocket连接数为0，可能存在连接问题"
+
+  - alert: WebSocketMessageRateTooHigh
+    expr: rate(carptms_websocket_messages_sent_total[5m]) + rate(carptms_websocket_messages_received_total[5m]) > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "WebSocket消息流量过高告警"
+      description: "WebSocket消息流量超过1000/分钟，当前值: {{ $value }}"
+
+- name: carptms_circuit_breaker_alerts
+  rules:
+  - alert: CircuitBreakerOpen
+    expr: carptms_circuit_breaker_state == 1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "电路断路器打开告警"
+      description: "系统电路断路器已打开，服务可能出现故障"
+
+  - alert: CircuitBreakerHalfOpen
+    expr: carptms_circuit_breaker_state == 2
+    for: 1m
+    labels:
+      severity: info
+    annotations:
+      summary: "电路断路器半开告警"
+      description: "系统电路断路器处于半开状态，正在尝试恢复"
+
+

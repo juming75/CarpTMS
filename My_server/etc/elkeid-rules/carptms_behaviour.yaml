@@ -1,0 +1,196 @@
+# CarpTMS 行为分析规则
+# 版本: 1.0
+# 日期: 2026-04-29
+
+rules:
+  # ==========================
+  # 用户行为分析
+  # ==========================
+  
+  - id: CARPTMS_LOGIN_TIME_ANOMALY
+    name: 非工作时间登录
+    description: 用户在凌晨 0:00-6:00 或深夜 22:00-24:00 期间登录系统
+    enable: true
+    severity: high
+    tags:
+      - authentication
+      - anomaly
+    
+    condition: |
+      field.log_type == "audit"
+      AND field.event_type == "login"
+      AND field.status == "success"
+      AND (
+           (field.hour >= 0 AND field.hour < 6) 
+           OR 
+           (field.hour >= 22 AND field.hour < 24)
+      )
+    
+    action:
+      - type: alert
+        channel: elkweb
+        message: "用户 {{field.username}} 在异常时间 ({{field.hour}}:00) 从 {{field.ip_address}} 登录"
+        
+      - type: mfa_required
+        user_id: "{{field.user_id}}"
+        message: "检测到异常时间登录，请进行二次验证"
+
+  - id: CARPTMS_LOGIN_LOCATION_ANOMALY
+    name: 异常地点登录
+    description: 用户从从未使用过的地理位置登录
+    enable: true
+    severity: high
+    tags:
+      - authentication
+      - location
+    
+    condition: |
+      field.log_type == "audit"
+      AND field.event_type == "login"
+      AND field.status == "success"
+      AND field.ip_region NOT IN user_known_regions
+    
+    action:
+      - type: alert
+      - type: mfa_required
+      - type: notify_admin
+
+  - id: CARPTMS_API_FREQUENCY_HIGH
+    name: API 调用频率异常
+    description: 单个用户 5 分钟内 API 调用超过 500 次
+    enable: true
+    severity: warning
+    tags:
+      - api
+      - rate-limit
+    
+    condition: |
+      field.log_type == "application"
+      AND field.type == "api_request"
+      AND field.user_id IS NOT NULL
+      AND window(field.user_id, 5m).count > 500
+    
+    action:
+      - type: alert
+      - type: throttle
+        rate_limit: "100 per 5m"
+  
+  - id: CARPTMS_OPERATOR_CHANGE_ROLE
+    name: 角色权限变更
+    description: 管理员修改用户角色或权限
+    enable: true
+    severity: critical
+    tags:
+      - permission
+      - admin
+    
+    condition: |
+      field.log_type == "audit"
+      AND field.event_type == "permission_change"
+      AND field.action IN ("grant", "revoke", "role_change")
+    
+    action:
+      - type: alert
+      - type: audit
+        details: "权限变更：{{field.action}} {{field.username}}"
+  
+  # ==========================
+  # 数据访问行为
+  # ==========================
+  
+  - id: CARPTMS_DATA_EXPORT_BULK
+    name: 批量敏感数据导出
+    description: 单次导出超过 1000 条敏感数据
+    enable: true
+    severity: critical
+    tags:
+      - data
+      - export
+    
+    condition: |
+      field.event_type == "data_export"
+      AND field.record_count > 1000
+      AND field.data_type IN ("user_info", "vehicle_info", "payment_info")
+    
+    action:
+      - type: alert
+      - type: block
+      - type: audit
+      - type: notify_admin
+
+  - id: CARPTMS_DATA_ACCESS_SENSITIVE
+    name: 敏感表频繁访问
+    description: 普通用户 1 小时内访问敏感表超过 10 次
+    enable: true
+    severity: warning
+    tags:
+      - data
+      - sensitive
+    
+    condition: |
+      field.event_type == "data_access"
+      AND field.resource_type == "database"
+      AND field.resource_name IN ("user_card", "payment_info", "audit_log")
+      AND field.user_role != "admin"
+      AND window(field.user_id, 1h).count > 10
+    
+    action:
+      - type: alert
+      - type: audit
+
+  - id: CARPTMS_DATA_DELETE_MULTIPLE
+    name: 批量数据删除
+    description: 单次删除超过 50 条数据
+    enable: true
+    severity: warning
+    tags:
+      - data
+      - delete
+    
+    condition: |
+      field.event_type == "data_delete"
+      AND field.record_count > 50
+    
+    action:
+      - type: alert
+      - type: audit
+  
+  # ==========================
+  # 业务操作行为
+  # ==========================
+  
+  - id: CARPTMS_PRICE_CHANGE
+    name: 订单/运费价格异常修改
+    description: 价格修改幅度超过 50%
+    enable: true
+    severity: high
+    tags:
+      - business
+      - price
+    
+    condition: |
+      field.event_type == "price_change"
+      AND field.percentage_change > 50
+      AND field.percentage_change < -50
+    
+    action:
+      - type: alert
+      - type: audit
+      - type: require_approval
+
+  - id: CARPTMS_WAYBILL_MODIFY_AFTER_COMPLETE
+    name: 已完成运单修改
+    description: 运单状态已变为"完成"后再次修改
+    enable: true
+    severity: warning
+    tags:
+      - business
+      - waybill
+    
+    condition: |
+      field.event_type == "waybill_modify"
+      AND field.previous_status == "completed"
+    
+    action:
+      - type: alert
+      - type: audit

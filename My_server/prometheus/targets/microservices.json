@@ -1,0 +1,92 @@
+[
+  {
+    "targets": ["vehicle-service:8083"],
+    "labels": {
+      "service_name": "vehicle-service",
+      "service_type": "transportation",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["cargo-service:8084"],
+    "labels": {
+      "service_name": "cargo-service",
+      "service_type": "cargo",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["trip-service:8085"],
+    "labels": {
+      "service_name": "trip-service",
+      "service_type": "transportation",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["billing-service:8086"],
+    "labels": {
+      "service_name": "billing-service",
+      "service_type": "billing",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["user-service:8087"],
+    "labels": {
+      "service_name": "user-service",
+      "service_type": "user",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["device-service:8088"],
+    "labels": {
+      "service_name": "device-service",
+      "service_type": "device",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["finance-service:8089"],
+    "labels": {
+      "service_name": "finance-service",
+      "service_type": "finance",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["location-service:8090"],
+    "labels": {
+      "service_name": "location-service",
+      "service_type": "location",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["weighing-service:8091"],
+    "labels": {
+      "service_name": "weighing-service",
+      "service_type": "weighing",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  },
+  {
+    "targets": ["alerts-service:8092"],
+    "labels": {
+      "service_name": "alerts-service",
+      "service_type": "alerts",
+      "version": "1.0.0",
+      "environment": "production"
+    }
+  }
+]

@@ -1,0 +1,144 @@
+{
+  "name": "carptms-client",
+  "version": "1.0.0",
+  "description": "CarpTMS Desktop Client - Electron + Vue 3 + TypeScript",
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky install",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win --x64",
+    "electron:build:win:arm64": "npm run build && electron-builder --win --arm64",
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:all": "npm run build && electron-builder --win --linux --mac",
+    "electron:build:analyze": "npm run build && electron-builder --win --dir --analyze",
+    "build:dev": "vite build --mode development",
+    "build:cargo": "vite build --mode production-cargo",
+    "build:sanitation": "vite build --mode production-sanitation",
+    "build:logistics": "vite build --mode production-logistics"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.1",
+    "@types/dompurify": "^3.0.5",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "axios": "^1.7.9",
+    "dayjs": "^1.11.19",
+    "dompurify": "^3.4.1",
+    "echarts": "^5.6.0",
+    "element-plus": "^2.13.7",
+    "flv.js": "^1.6.2",
+    "ol": "^10.7.0",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/test-utils": "^2.4.6",
+    "concurrently": "^8.2.2",
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0",
+    "eslint": "^9.39.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "husky": "^9.0.11",
+    "jsdom": "^27.4.0",
+    "prettier": "^3.2.5",
+    "sass-embedded": "^1.99.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.52.0",
+    "vite": "^6.0.3",
+    "vitest": "^4.0.16",
+    "vue-tsc": "^2.1.10",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.carptms.client",
+    "productName": "CarpTMS",
+    "copyright": "Copyright © 2026 CarpTMS",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      "public/**/*"
+    ],
+    "asar": {
+      "smartUnpack": true,
+      "compression": "normal"
+    },
+    "buildDependenciesFromSource": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GVLP",
+      "runAfterFinish": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": [
+        "deb",
+        "rpm",
+        "AppImage"
+      ],
+      "icon": "build/icon.png"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "pkg",
+        "zip"
+      ],
+      "icon": "build/icon.icns"
+    }
+  },
+  "electronRebuildConfig": {
+    "force": true,
+    "onlyModules": [
+      "better-sqlite3"
+    ],
+    "buildFromSource": false
+  }
+}

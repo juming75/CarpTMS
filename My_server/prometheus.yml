@@ -1,0 +1,45 @@
+﻿# Prometheus 配置文件
+global:
+  scrape_interval:     15s # 全局抓取间隔
+  evaluation_interval: 15s # 全局规则评估间隔
+
+# 规则文件配置(含WebSocket告警)
+rule_files:
+  - "deploy/prometheus/rules/alerts.yml"
+
+# Alertmanager配置
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['alertmanager:9093']
+
+# 抓取配置
+scrape_configs:
+  # 监控 Prometheus 自身
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 监控 TMS 服务器
+  - job_name: 'tms_server'
+    static_configs:
+      - targets: ['tms_server:8081']
+    metrics_path: '/api/metrics'
+
+  # 监控 WebSocket 服务
+  - job_name: 'tms_websocket'
+    static_configs:
+      - targets: ['tms_server:8082']
+    metrics_path: '/metrics'
+
+  # 可选：监控 Docker 容器
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['docker.for.mac.host.internal:9323']
+
+  # 可选：监控 PostgreSQL 数据库
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['db:9187']
+
+

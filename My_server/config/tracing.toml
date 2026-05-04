@@ -1,0 +1,132 @@
+# CarpTMS OpenTelemetry 链路追踪配置
+# 
+# 功能：
+# - HTTP 请求链路追踪
+# - 数据库查询追踪
+# - gRPC 调用追踪
+# - 自定义 span 追踪
+#
+# 导出方式支持：
+# - OTLP (OpenTelemetry Collector)
+# - Jaeger
+# - Zipkin
+# - Console (开发调试)
+
+[tracing]
+# 是否启用链路追踪
+enabled = true
+
+# 服务名称（用于在追踪系统中标识服务）
+service_name = "carptms-server"
+
+# 服务版本
+service_version = "2.0.0"
+
+# 环境标签
+environment = "production"
+
+# ============ 导出器配置 ============
+
+[tracing.exporter]
+
+# 导出类型：otlp, jaeger, zipkin, console
+exporter_type = "otlp"
+
+# OTLP 配置（推荐用于生产环境）
+[tracing.exporter.otlp]
+# OTLP 协议：grpc, http/protobuf
+protocol = "grpc"
+# OTLP 接收端点（生产环境：前端服务器）
+endpoint = "http://115.231.221.70:4317"
+# 是否使用 TLS
+use_tls = false
+# 超时时间（秒）
+timeout_secs = 30
+
+# Jaeger 配置（备选）
+[tracing.exporter.jaeger]
+agent_host = "localhost"
+agent_port = 6831
+# 可选：Jaeger Collector
+# collector_endpoint = "http://localhost:14268/api/traces"
+
+# Zipkin 配置（备选）
+[tracing.exporter.zipkin]
+endpoint = "http://localhost:9411/api/v2/spans"
+
+# Console 配置（仅开发调试）
+[tracing.exporter.console]
+pretty_print = true
+
+# ============ 采样配置 ============
+
+[tracing.sampling]
+
+# 采样类型：always_on, always_off, trace_id_ratio, parent_based
+sampler_type = "parent_based"
+
+# 采样率（0.0 - 1.0），当 sampler_type = trace_id_ratio 时生效
+sampling_ratio = 0.1  # 10% 采样率，适合高并发生产环境
+
+# 父级采样：如果请求有父 span，继承父 span 的采样决定
+inherit_parent = true
+
+# ============ 追踪内容配置 ============
+
+[tracing.attributes]
+# 全局属性，会添加到所有 span
+[tracing.attributes.static]
+team = "carptms"
+service = "backend"
+env = "production"
+
+# ============ HTTP 追踪配置 ============
+
+[tracing.http]
+# 是否追踪 HTTP 请求
+enabled = true
+# 追踪请求路径模式（ant 风格，* 匹配任意字符）
+# 设置为 ["*"] 追踪所有请求
+tracked_paths = ["/*"]
+# 排除的路径（不追踪这些路径）
+excluded_paths = ["/health", "/metrics", "/favicon.ico"]
+# 是否记录请求体（注意：可能包含敏感信息）
+record_request_body = false
+# 是否记录响应体（注意：可能包含敏感信息）
+record_response_body = false
+
+# ============ 数据库追踪配置 ============
+
+[tracing.database]
+# 是否追踪数据库操作
+enabled = true
+# 是否记录 SQL 语句
+record_sql_statements = true
+# 是否记录 SQL 参数（注意：可能包含敏感信息）
+record_sql_parameters = false
+# 慢查询阈值（毫秒），超过此阈值的查询会记录为 "slow"
+slow_query_threshold_ms = 100
+
+# ============ WebSocket 追踪配置 ============
+
+[tracing.websocket]
+# 是否追踪 WebSocket 连接
+enabled = true
+# 是否记录消息内容
+record_message_content = false
+
+# ============ gRPC 追踪配置 ============
+
+[tracing.grpc]
+# 是否追踪 gRPC 调用
+enabled = true
+# 是否记录消息内容
+record_message_content = false
+
+# ============ 日志集成 ============
+
+[tracing.logging]
+# 是否将追踪 ID 添加到日志
+enabled = true
+# 日志字段名
+log_field_name = "trace_id"

@@ -1,0 +1,9 @@
+[package]
+name = "tms_truck_scale"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]

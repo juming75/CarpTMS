@@ -1,0 +1,204 @@
+# ==============================================================================
+# Prometheus 告警规则配置
+# ==============================================================================
+
+groups:
+  - name: carptms-alerts
+    rules:
+      # ========================================================================
+      # 系统资源告警
+      # ========================================================================
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "高CPU使用率告警"
+          description: "实例 {{ $labels.instance }} CPU使用率超过80%，当前值: {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "高内存使用率告警"
+          description: "实例 {{ $labels.instance }} 内存使用率超过85%，当前值: {{ $value }}%"
+
+      - alert: HighDiskUsage
+        expr: 100 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100) > 90
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "高磁盘使用率告警"
+          description: "实例 {{ $labels.instance }} 磁盘使用率超过90%，当前值: {{ $value }}%"
+
+      # ========================================================================
+      # 数据库告警
+      # ========================================================================
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL 服务宕机"
+          description: "PostgreSQL 实例 {{ $labels.instance }} 不可用"
+
+      - alert: HighPostgresConnections
+        expr: sum(pg_stat_activity_count) / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL 连接数过高"
+          description: "PostgreSQL 连接使用率超过80%，当前值: {{ $value }}%"
+
+      - alert: PostgresReplicationLag
+        expr: pg_stat_wal_receiver_lag_bytes > 104857600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL 复制延迟过高"
+          description: "从库延迟超过100MB，当前值: {{ $value }}"
+
+      # ========================================================================
+      # Redis 告警
+      # ========================================================================
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 服务宕机"
+          description: "Redis 实例 {{ $labels.instance }} 不可用"
+
+      - alert: HighRedisMemoryUsage
+        expr: redis_used_memory / redis_total_system_memory * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis 内存使用率过高"
+          description: "Redis 内存使用率超过80%，当前值: {{ $value }}%"
+
+      # ========================================================================
+      # 应用服务告警
+      # ========================================================================
+      - alert: BackendDown
+        expr: up{job="carptms-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "后端服务宕机"
+          description: "后端服务实例 {{ $labels.instance }} 不可用"
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "请求延迟过高"
+          description: "95% 请求延迟超过2秒，当前值: {{ $value }}s"
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "错误率过高"
+          description: "HTTP 错误率超过5%，当前值: {{ $value }}%"
+
+      - alert: HighWebSocketConnections
+        expr: websocket_connections > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket 连接数过高"
+          description: "WebSocket 连接数超过5000，当前值: {{ $value }}"
+
+      # ========================================================================
+      # WebSocket 连接稳定性告警（2026-05-02 新增）
+      # ========================================================================
+      - alert: WebSocketHighReconnectRate
+        expr: rate(websocket_reconnect_attempts_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket重连率过高"
+          description: "每秒重连尝试次数超过0.1，可能存在连接不稳定问题。当前速率: {{ $value }}/s"
+
+      - alert: WebSocketReconnectFailures
+        expr: rate(websocket_reconnect_failures_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WebSocket重连失败率过高"
+          description: "重连失败率过高（>5%），可能服务器或网络异常。失败速率: {{ $value }}/s"
+
+      - alert: WebSocketConnectionDropSpike
+        expr: rate(websocket_disconnections_total[1m]) > rate(websocket_connections_total[1m]) * 0.5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WebSocket连接断开激增"
+          description: "检测到大量连接突然断开，可能是服务端问题或网络故障。断开速率: {{ $value }}/s"
+
+      - alert: WebSocketHeartbeatFailure
+        expr: rate(websocket_heartbeat_failures_total[5m]) / rate(websocket_heartbeat_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket心跳失败率过高"
+          description: "心跳失败率超过30%，客户端可能无法正常响应。失败率: {{ $value }}"
+
+      - alert: WebSocketMessageQueueBacklog
+        expr: websocket_message_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket消息队列积压"
+          description: "待发送消息队列长度超过100条，可能影响实时性。队列长度: {{ $value }}"
+
+      - alert: WebSocketLowConnectionQuality
+        expr: avg(websocket_connection_quality) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WebSocket连接质量下降"
+          description: "平均连接质量低于70%（基于心跳成功率），网络可能不稳定。质量值: {{ $value }}"
+
+      # ========================================================================
+      # Nginx 告警
+      # ========================================================================
+      - alert: NginxDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx 服务宕机"
+          description: "Nginx 实例 {{ $labels.instance }} 不可用"
+
+      - alert: HighNginxRequests
+        expr: sum(rate(nginx_http_requests_total[5m])) > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx 请求量过高"
+          description: "每秒请求数超过10000，当前值: {{ $value }}"

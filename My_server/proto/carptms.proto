@@ -1,0 +1,296 @@
+syntax = "proto3";
+
+package carptms;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// 通用响应消息
+message Response {
+  int32 code = 1;
+  string message = 2;
+  bytes data = 3;
+}
+
+// 用户服务
+service UserService {
+  rpc GetUser(GetUserRequest) returns (UserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc CreateUser(CreateUserRequest) returns (UserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (Response);
+}
+
+// 车辆服务
+service VehicleService {
+  rpc GetVehicle(GetVehicleRequest) returns (VehicleResponse);
+  rpc ListVehicles(ListVehiclesRequest) returns (ListVehiclesResponse);
+  rpc CreateVehicle(CreateVehicleRequest) returns (VehicleResponse);
+  rpc UpdateVehicle(UpdateVehicleRequest) returns (VehicleResponse);
+  rpc DeleteVehicle(DeleteVehicleRequest) returns (Response);
+}
+
+// 订单服务
+service OrderService {
+  rpc GetOrder(GetOrderRequest) returns (OrderResponse);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+  rpc CreateOrder(CreateOrderRequest) returns (OrderResponse);
+  rpc UpdateOrder(UpdateOrderRequest) returns (OrderResponse);
+  rpc DeleteOrder(DeleteOrderRequest) returns (Response);
+}
+
+// 设备服务
+service DeviceService {
+  rpc GetDevice(GetDeviceRequest) returns (DeviceResponse);
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  rpc CreateDevice(CreateDeviceRequest) returns (DeviceResponse);
+  rpc UpdateDevice(UpdateDeviceRequest) returns (DeviceResponse);
+  rpc DeleteDevice(DeleteDeviceRequest) returns (Response);
+}
+
+// 司机服务
+service DriverService {
+  rpc GetDriver(GetDriverRequest) returns (DriverResponse);
+  rpc ListDrivers(ListDriversRequest) returns (ListDriversResponse);
+  rpc CreateDriver(CreateDriverRequest) returns (DriverResponse);
+  rpc UpdateDriver(UpdateDriverRequest) returns (DriverResponse);
+  rpc DeleteDriver(DeleteDriverRequest) returns (Response);
+}
+
+// 通用请求/响应消息
+message GetUserRequest {
+  string id = 1;
+}
+
+message UserResponse {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string role = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListUsersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+}
+
+message ListUsersResponse {
+  repeated UserResponse users = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+  string email = 3;
+  string role = 4;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string username = 2;
+  optional string password = 3;
+  optional string email = 4;
+  optional string role = 5;
+}
+
+message DeleteUserRequest {
+  string id = 1;
+}
+
+// 车辆相关消息
+message GetVehicleRequest {
+  string id = 1;
+}
+
+message VehicleResponse {
+  string id = 1;
+  string license_plate = 2;
+  string vehicle_type = 3;
+  string model = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ListVehiclesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+  string status = 4;
+}
+
+message ListVehiclesResponse {
+  repeated VehicleResponse vehicles = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateVehicleRequest {
+  string license_plate = 1;
+  string vehicle_type = 2;
+  string model = 3;
+  string status = 4;
+}
+
+message UpdateVehicleRequest {
+  string id = 1;
+  optional string license_plate = 2;
+  optional string vehicle_type = 3;
+  optional string model = 4;
+  optional string status = 5;
+}
+
+message DeleteVehicleRequest {
+  string id = 1;
+}
+
+// 订单相关消息
+message GetOrderRequest {
+  string id = 1;
+}
+
+message OrderResponse {
+  string id = 1;
+  string order_number = 2;
+  string status = 3;
+  string customer_name = 4;
+  double amount = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ListOrdersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+  string status = 4;
+}
+
+message ListOrdersResponse {
+  repeated OrderResponse orders = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateOrderRequest {
+  string order_number = 1;
+  string status = 2;
+  string customer_name = 3;
+  double amount = 4;
+}
+
+message UpdateOrderRequest {
+  string id = 1;
+  optional string order_number = 2;
+  optional string status = 3;
+  optional string customer_name = 4;
+  optional double amount = 5;
+}
+
+message DeleteOrderRequest {
+  string id = 1;
+}
+
+// 设备相关消息
+message GetDeviceRequest {
+  string id = 1;
+}
+
+message DeviceResponse {
+  string id = 1;
+  string device_name = 2;
+  string device_type = 3;
+  string device_model = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ListDevicesRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+  string status = 4;
+}
+
+message ListDevicesResponse {
+  repeated DeviceResponse devices = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateDeviceRequest {
+  string device_name = 1;
+  string device_type = 2;
+  string device_model = 3;
+  string status = 4;
+}
+
+message UpdateDeviceRequest {
+  string id = 1;
+  optional string device_name = 2;
+  optional string device_type = 3;
+  optional string device_model = 4;
+  optional string status = 5;
+}
+
+message DeleteDeviceRequest {
+  string id = 1;
+}
+
+// 司机相关消息
+message GetDriverRequest {
+  string id = 1;
+}
+
+message DriverResponse {
+  string id = 1;
+  string name = 2;
+  string license_number = 3;
+  string phone = 4;
+  string status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message ListDriversRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string search = 3;
+  string status = 4;
+}
+
+message ListDriversResponse {
+  repeated DriverResponse drivers = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message CreateDriverRequest {
+  string name = 1;
+  string license_number = 2;
+  string phone = 3;
+  string status = 4;
+}
+
+message UpdateDriverRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string license_number = 3;
+  optional string phone = 4;
+  optional string status = 5;
+}
+
+message DeleteDriverRequest {
+  string id = 1;
+}

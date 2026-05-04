@@ -1,0 +1,148 @@
+# Redis Helm Chart 配置
+# Sentinel 模式高可用集群
+
+replicaCount: 3
+
+image:
+  repository: redis
+  tag: "7.2-alpine"
+  pullPolicy: IfNotPresent
+
+# Redis Sentinel 配置
+sentinel:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7.2-alpine"
+  replicaCount: 3
+  service:
+    type: ClusterIP
+  config:
+    downAfterMilliseconds: 5000
+    failoverTimeout: 10000
+    parallelSyncs: 1
+    notificationScript: ""
+    clientReconnectScript: ""
+    sentinelTiltInfoScript: ""
+
+# 主库配置
+master:
+  count: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: fast-ssd
+    subPath: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  config:
+    maxmemory: 2147483648  # 2GB
+    maxmemory-policy: allkeys-lru
+    maxmemory-samples: 5
+    activedefrag: "yes"
+    appendonly: "yes"
+    appendfsync: everysec
+    auto_aof_rewrite_percentage: "100"
+    auto_aof_rewrite_min_size: "64mb"
+
+# 从库配置
+replica:
+  count: 2
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: fast-ssd
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  config:
+    maxmemory: 2147483648
+    maxmemory-policy: allkeys-lru
+    readOnly: "yes"
+
+# 服务配置
+service:
+  redis:
+    type: ClusterIP
+    port: 6379
+    sentinelPort: 26379
+  metrics:
+    enabled: true
+    port: 9121
+
+# 监控配置
+metrics:
+  enabled: true
+  image:
+    repository: oliver006/redis_exporter
+    tag: v1.55.0
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Pod 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod 安全策略
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1001
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+
+# 探针配置
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 15
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# 网络策略
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: carptms
+      ports:
+        - port: 6379
+        - port: 26379
+
+# 拓扑分布
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/component: replica

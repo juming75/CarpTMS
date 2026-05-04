@@ -1,0 +1,125 @@
+# CarpTMS 配置文件 - 单体 DDD 架构
+# 
+# 架构说明：
+# - 所有服务在同一个进程中运行
+# - 采用领域驱动设计（DDD）
+# - 共享数据库连接池
+# - 领域事件在进程内传递
+# 
+# 适用场景：
+# - 中小型项目
+# - 快速开发和部署
+# - 团队规模较小
+
+architecture:
+  mode: monolith_ddd
+  enable_event_driven: true
+  persist_domain_events: true
+  bounded_contexts:
+    - name: transportation
+      description: 运输管理上下文
+      aggregates:
+        - Vehicle
+        - Driver
+        - Trip
+      domain_services:
+        - VehicleService
+        - TripService
+        - DispatchService
+      application_services:
+        - TransportationAppService
+    - name: cargo
+      description: 货物管理上下文
+      aggregates:
+        - Cargo
+        - Container
+        - Warehouse
+      domain_services:
+        - CargoService
+        - InventoryService
+      application_services:
+        - CargoAppService
+    - name: billing
+      description: 计费管理上下文
+      aggregates:
+        - Invoice
+        - Payment
+        - Settlement
+      domain_services:
+        - BillingService
+        - PaymentService
+      application_services:
+        - BillingAppService
+
+server:
+  host: "0.0.0.0"
+  port: 8082
+  enable_tls: false
+  tls_cert_path: null
+  tls_key_path: null
+
+database:
+  url: "postgresql://postgres:${DB_PASSWORD}@localhost:5432/CarpTMS_db"
+  max_connections: 20
+  min_connections: 5
+  connect_timeout: 30
+
+redis:
+  url: "redis://localhost:6379/0"
+  max_connections: 10
+  default_ttl: 300
+
+security:
+  jwt_secret: "${JWT_SECRET}"
+  jwt_expiration: 86400
+  argon2_memory: 65536
+  argon2_time: 3
+  argon2_parallelism: 4
+  enable_https: false
+  allowed_origins:
+    - "http://localhost:5173"
+    - "http://127.0.0.1:5173"
+    - "http://localhost:8082"
+
+monitoring:
+  enable_prometheus: true
+  enable_tracing: true
+  tracing_service_url: null
+  slow_query_threshold: 100
+
+logging:
+  level: "info"
+  format: "json"
+  file_path: null
+
+gateway:
+  jt808_address: "0.0.0.0:8988"
+  websocket_address: "0.0.0.0:8089"
+  max_connections: 10000
+
+video:
+  enabled: false
+  jt1078_max_connections: 1000
+  gb28181_sip_port: 5060
+  storage_path: "./data/videos"
+
+sync:
+  enabled: true
+  interval_seconds: 300
+  legacy_host: "127.0.0.1"
+  legacy_port: 9808
+
+circuit_breaker:
+  failure_threshold: 0.5
+  request_threshold: 20
+  open_timeout_seconds: 30
+  half_open_requests: 5
+  half_open_success_threshold: 3
+  exempt_paths:
+    - "/api/health"
+    - "/api/health/ready"
+    - "/api/health/live"
+    - "/api/metrics"
+    - "/api/auth/login"
+    - "/api/auth/refresh"
+    - "/ws"

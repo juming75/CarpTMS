@@ -1,0 +1,368 @@
+# CarpTMS Prometheus 告警规则
+# 文件: prometheus/alerts/carptms_business.yml
+
+groups:
+  # === 业务告警组 ===
+  - name: carptms.business
+    interval: 30s
+    rules:
+      # 订单告警
+      - alert: OrderCreationFailed
+        expr: |
+          (
+            rate(orders_created_total[5m]) -
+            rate(orders_succeeded_total[5m])
+          ) / rate(orders_created_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: order
+        annotations:
+          summary: "订单创建失败率过高"
+          description: "订单创建失败率超过 10%，当前值: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.carptms.com/runbooks/order-failures"
+
+      - alert: OrderProcessingTimeout
+        expr: |
+          histogram_quantile(0.95,
+            rate(order_processing_duration_seconds_bucket[5m])
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: order
+        annotations:
+          summary: "订单处理超时"
+          description: "95% 订单处理时间超过 30 秒"
+
+      # 车辆告警
+      - alert: VehicleOfflineRate
+        expr: |
+          sum(vehicle_online_total == 0) /
+          sum(vehicle_total) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          component: vehicle
+        annotations:
+          summary: "车辆离线率过高"
+          description: "超过 5% 的车辆处于离线状态"
+
+      - alert: VehicleGPSDataStale
+        expr: |
+          time() - vehicle_last_gps_timestamp > 300
+        for: 5m
+        labels:
+          severity: info
+          component: vehicle
+        annotations:
+          summary: "车辆 GPS 数据过期"
+          description: "车辆 {{ $labels.vehicle_id }} 超过 5 分钟未上报 GPS 数据"
+
+      # 地磅告警
+      - alert: WeighingScaleDataMismatch
+        expr: |
+          abs(
+            vehicle_weight{type="weighing"} -
+            vehicle_weight{type="actual"}
+          ) / vehicle_weight{type="actual"} > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: truck_scale
+        annotations:
+          summary: "地磅数据异常"
+          description: "车辆 {{ $labels.vehicle_id }} 过磅数据与实际数据偏差超过 5%"
+
+      - alert: WeighingScaleOffline
+        expr: |
+          scale_online_total == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: truck_scale
+        annotations:
+          summary: "地磅设备离线"
+          description: "地磅设备 {{ $labels.scale_id }} 已离线超过 5 分钟"
+
+  # === API 告警组 ===
+  - name: carptms.api
+    interval: 30s
+    rules:
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "HTTP 5xx 错误率过高"
+          description: "5xx 错误率超过 5%，当前值: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.carptms.com/runbooks/http-errors"
+
+      - alert: HighHTTP4xxErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"4.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.20
+        for: 10m
+        labels:
+          severity: info
+          component: api
+        annotations:
+          summary: "HTTP 4xx 错误率偏高"
+          description: "4xx 错误率超过 20%，可能存在客户端问题"
+
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "HTTP 请求延迟过高"
+          description: "API 处理器 {{ $labels.handler }} 的 P95 延迟超过 2 秒"
+
+      - alert: HTTPLatencySLOBreach
+        expr: |
+          (
+            sum(rate(http_request_duration_seconds_bucket{le="0.5"}[5m])) /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) < 0.95
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+          slo: latency
+        annotations:
+          summary: "API 延迟 SLO 违规"
+          description: "超过 5% 的请求延迟超过 500ms，违反 95% SLO"
+
+      - alert: APIRequestRateLow
+        expr: |
+          sum(rate(http_requests_total[5m])) < 10
+        for: 30m
+        labels:
+          severity: info
+          component: api
+        annotations:
+          summary: "API 请求率异常低"
+          description: "API 请求率低于正常水平，可能存在服务问题"
+
+  # === 数据库告警组 ===
+  - name: carptms.database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          database_pool_size / database_pool_max > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "数据库连接池即将耗尽"
+          description: "数据库连接池使用率超过 90%，当前值: {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.carptms.com/runbooks/db-pool"
+
+      - alert: DatabaseSlowQueries
+        expr: |
+          rate(database_slow_queries_total[5m]) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "数据库慢查询过多"
+          description: "数据库慢查询速率超过 10/秒"
+
+      - alert: DatabaseReplicationLag
+        expr: |
+          database_replication_lag_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "数据库复制延迟过高"
+          description: "数据库复制延迟超过 10 秒"
+
+      - alert: DatabaseDiskSpaceLow
+        expr: |
+          database_disk_usage_percent > 85
+        for: 30m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "数据库磁盘空间不足"
+          description: "数据库磁盘使用率超过 85%"
+          runbook_url: "https://docs.carptms.com/runbooks/db-disk"
+
+  # === 缓存告警组 ===
+  - name: carptms.cache
+    interval: 30s
+    rules:
+      - alert: CacheHitRateLow
+        expr: |
+          (
+            sum(rate(cache_hits_total[5m])) /
+            sum(rate(cache_hits_total[5m]) + rate(cache_misses_total[5m]))
+          ) < 0.70
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "缓存命中率低"
+          description: "缓存命中率低于 70%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: CacheMemoryUsageHigh
+        expr: |
+          cache_memory_usage_bytes / cache_memory_limit_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "缓存内存使用率过高"
+          description: "Redis 内存使用率超过 85%"
+
+      - alert: RedisConnectionFailures
+        expr: |
+          rate(redis_connection_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis 连接失败"
+          description: "Redis 连接失败率异常"
+
+  # === JWT 认证告警组 ===
+  - name: carptms.auth
+    interval: 30s
+    rules:
+      - alert: JWTValidationFailureRate
+        expr: |
+          (
+            sum(rate(jwt_validation_failures_total[5m])) /
+            sum(rate(jwt_validation_total[5m]))
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "JWT 验证失败率偏高"
+          description: "JWT 验证失败率超过 1%，可能存在安全问题"
+
+      - alert: UnauthorizedAccessAttempt
+        expr: |
+          rate(unauthorized_access_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: auth
+        annotations:
+          summary: "未授权访问尝试过多"
+          description: "检测到大量未授权访问尝试，可能存在暴力攻击"
+
+  # === 系统资源告警组 ===
+  - name: carptms.system
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: |
+          system_cpu_usage_percent > 80
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "CPU 使用率过高"
+          description: "系统 CPU 使用率超过 80%，持续 15 分钟"
+
+      - alert: HighMemoryUsage
+        expr: |
+          system_memory_usage_percent > 85
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "内存使用率过高"
+          description: "系统内存使用率超过 85%，持续 15 分钟"
+
+      - alert: DiskSpaceLow
+        expr: |
+          system_disk_usage_percent > 90
+        for: 30m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "磁盘空间不足"
+          description: "系统磁盘使用率超过 90%"
+          runbook_url: "https://docs.carptms.com/runbooks/disk-space"
+
+  # === 服务健康告警组 ===
+  - name: carptms.health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: |
+          up{job="carptms"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "CarpTMS 服务实例不可用"
+          description: "服务实例 {{ $labels.instance }} 已经宕机超过 1 分钟"
+          runbook_url: "https://docs.carptms.com/runbooks/service-down"
+
+      - alert: ServiceExiting
+        expr: |
+          rate(service_restart_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: service
+        annotations:
+          summary: "服务频繁重启"
+          description: "服务实例 {{ $labels.instance }} 正在频繁重启"
+
+  # === 消息队列告警组 ===
+  - name: carptms.mq
+    interval: 30s
+    rules:
+      - alert: MessageQueueLag
+        expr: |
+          mq_consumer_lag > 10000
+        for: 15m
+        labels:
+          severity: warning
+          component: mq
+        annotations:
+          summary: "消息队列消费滞后"
+          description: "消息队列消费滞后超过 10000 条消息"
+
+      - alert: MessageQueueFull
+        expr: |
+          mq_queue_depth / mq_queue_capacity > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: mq
+        annotations:
+          summary: "消息队列即将满"
+          description: "消息队列使用率超过 90%"

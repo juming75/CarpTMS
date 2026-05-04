@@ -1,0 +1,112 @@
+﻿# 编译产物
+target/
+**/target/
+
+# 前端依赖
+**/node_modules/
+
+# 前端构建产物
+**/dist/
+**/.vite/
+**/.turbo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 日志文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 环境文件
+# 根目录的.env是示例配置（无敏感信息），可以提交
+!.env
+# 其他.env文件可能包含敏感信息，不要提交
+.env.local
+.env.*.local
+!.env.example
+!.env.production
+!.env.production-cargo
+!.env.production-logistics
+!.env.production-sanitation
+
+# 操作系统文件
+Thumbs.db
+Desktop.ini
+nul
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+
+# 调试脚本和工具（不需要开源）
+*.py
+*.js
+*.ps1
+*.sql
+*.sh
+!*.example
+
+# AI模型文件（太大，不需要开源）
+*.gguf
+*.gst
+
+# 地图数据
+map/
+
+# 覆盖率报告
+*.profraw
+*.prof
+coverage/
+
+# 安全扫描结果
+security-scan-results/
+
+# Docker相关（构建产物）
+.dockerignore
+
+# 大型数据文件
+*.csv
+*.xlsx
+*.xls
+data/
+
+# PostgreSQL数据目录
+postgres/data/
+
+# 备份文件
+*.backup
+*.bak
+backup/
+
+# Redis数据
+*.rdb
+*.aof
+
+# Cargo.lock (对于开源项目，建议保留以确保可重现构建)
+# 如果确实不需要，注释掉下一行
+Cargo.lock
+
+# 二进制文件
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 测试覆盖率
+cov/
+lcov.info
+coverage.info
+
+# 构建日志
+build.log
+cmake-build-*/
+compile_commands.json

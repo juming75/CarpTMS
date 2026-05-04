@@ -1,0 +1,164 @@
+# Filebeat 配置 - CarpTMS → Elkeid
+# 版本: 1.0
+# 日期: 2026-04-29
+
+filebeat.inputs:
+  # ======================
+  # CarpTMS 应用日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/carptms/app.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      service: carptms
+      log_type: application
+      environment: production
+    fields_under_root: true
+    tags: ["carptms", "application"]
+
+  # ======================
+  # CarpTMS 审计日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/carptms/audit.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      service: carptms
+      log_type: audit
+      environment: production
+    fields_under_root: true
+    tags: ["carptms", "audit"]
+
+  # ======================
+  # CarpTMS 访问日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/carptms/access.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      service: carptms
+      log_type: access
+      environment: production
+    fields_under_root: true
+    tags: ["carptms", "access"]
+
+  # ======================
+  # PostgreSQL 日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/postgresql/postgresql-*.log
+    fields:
+      service: carptms
+      log_type: database
+      database: postgresql
+    tags: ["database", "postgresql"]
+
+  # ======================
+  # Redis 日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/redis/redis.log
+    fields:
+      service: carptms
+      log_type: database
+      database: redis
+    tags: ["database", "redis"]
+
+  # ======================
+  # Nginx 日志
+  # ======================
+  
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+    fields:
+      service: carptms
+      log_type: web
+      web_server: nginx
+    tags: ["web", "nginx"]
+
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/error.log
+    fields:
+      service: carptms
+      log_type: web
+      web_server: nginx
+    tags: ["web", "nginx"]
+
+# ======================
+# 输出到 Kafka
+# ======================
+
+output.kafka:
+  hosts: ["kafka:9092"]
+  topic: "elkeid-carptms-logs"
+  key: "%{[service]}"
+  partition.round_robin:
+    reachable_only: false
+  compression: gzip
+  max_message_bytes: 1000000
+  required_acks: 1
+
+# ======================
+# 日志处理
+# ======================
+
+processors:
+  - add_cloud_metadata: ~
+  - add_host_metadata: ~
+  - add_docker_metadata: ~
+  - add_id: ~
+  - add_timestamp: ~
+  
+  - add_fields:
+      target: ""
+      fields:
+        customer: "carptms"
+        product: "vehicle_tms"
+        version: "1.0"
+
+# ======================
+# 监控
+# ======================
+
+http.enabled: true
+http.host: "0.0.0.0"
+http.port: 5066
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# ======================
+# 队列与内存
+# ======================
+
+queue.mem:
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 5s

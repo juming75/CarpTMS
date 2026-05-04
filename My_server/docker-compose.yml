@@ -1,0 +1,499 @@
+﻿version: '3.8'
+
+services:
+  # PostgreSQL主数据库服务
+  db_master:
+    image: postgres:15-alpine
+    container_name: tms_db_master
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tms
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: replication_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_master_data:/var/lib/postgresql/data
+      - ./postgres/init_master.sh:/docker-entrypoint-initdb.d/init.sh 2>/dev/null || true
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql 2>/dev/null || true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tms_network
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=5
+      -c max_replication_slots=5
+      -c hot_standby=on
+      -c wal_keep_size=256
+
+  # PostgreSQL从数据库服务
+  db_slave:
+    image: postgres:15-alpine
+    container_name: tms_db_slave
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tms
+      POSTGRES_REPLICATION_USER: replicator
+      POSTGRES_REPLICATION_PASSWORD: replication_pass
+      POSTGRES_MASTER_HOST: db_master
+    depends_on:
+      db_master:
+        condition: service_healthy
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_slave_data:/var/lib/postgresql/data
+      - ./postgres/init_slave.sh:/docker-entrypoint-initdb.d/init.sh 2>/dev/null || true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tms_network
+
+  # Redis主节点1
+  redis-master-1:
+    image: redis:7-alpine
+    container_name: tms_redis_master_1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_master_1_data:/data
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis主节点2
+  redis-master-2:
+    image: redis:7-alpine
+    container_name: tms_redis_master_2
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_master_2_data:/data
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis主节点3
+  redis-master-3:
+    image: redis:7-alpine
+    container_name: tms_redis_master_3
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_master_3_data:/data
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis从节点1
+  redis-slave-1:
+    image: redis:7-alpine
+    container_name: tms_redis_slave_1
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_slave_1_data:/data
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis从节点2
+  redis-slave-2:
+    image: redis:7-alpine
+    container_name: tms_redis_slave_2
+    ports:
+      - "6383:6379"
+    volumes:
+      - redis_slave_2_data:/data
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis从节点3
+  redis-slave-3:
+    image: redis:7-alpine
+    container_name: tms_redis_slave_3
+    ports:
+      - "6384:6379"
+    volumes:
+      - redis_slave_3_data:/data
+    depends_on:
+      - redis-master-1
+      - redis-master-2
+      - redis-master-3
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes
+
+  # Redis集群初始化服务
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: tms_redis_cluster_init
+    depends_on:
+      redis-master-1:
+        condition: service_healthy
+      redis-master-2:
+        condition: service_healthy
+      redis-master-3:
+        condition: service_healthy
+      redis-slave-1:
+        condition: service_healthy
+      redis-slave-2:
+        condition: service_healthy
+      redis-slave-3:
+        condition: service_healthy
+    networks:
+      - tms_network
+    command: >
+      sh -c "
+        echo '等待Redis节点启动完成...';
+        sleep 10;
+        echo '开始创建Redis集群...';
+        redis-cli --cluster create \
+          redis-master-1:6379 \
+          redis-master-2:6379 \
+          redis-master-3:6379 \
+          redis-slave-1:6379 \
+          redis-slave-2:6379 \
+          redis-slave-3:6379 \
+          --cluster-replicas 1 --cluster-yes;
+        echo 'Redis集群创建完成！';
+      "
+    restart: "no"
+
+  # TMS Web服务器 - 蓝色环境
+  web_blue:
+    build: .
+    container_name: tms_web_blue
+    depends_on:
+      db_master:
+        condition: service_healthy
+      db_slave:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master-1:6379,redis://redis-master-2:6379,redis://redis-master-3:6379
+      JWT_SECRET: your_jwt_secret_key_here
+      PORT: 8080
+      LOG_LEVEL: info
+      SERVER_HOST: 0.0.0.0
+      ENVIRONMENT: blue
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./.env:/app/.env 2>/dev/null || true
+    networks:
+      - tms_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # TMS Web服务器 - 绿色环境
+  web_green:
+    build: .
+    container_name: tms_web_green
+    depends_on:
+      db_master:
+        condition: service_healthy
+      db_slave:
+        condition: service_healthy
+      redis-cluster-init:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master-1:6379,redis://redis-master-2:6379,redis://redis-master-3:6379
+      JWT_SECRET: your_jwt_secret_key_here
+      PORT: 8080
+      LOG_LEVEL: info
+      SERVER_HOST: 0.0.0.0
+      ENVIRONMENT: green
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./.env:/app/.env 2>/dev/null || true
+    networks:
+      - tms_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Nginx负载均衡器
+  nginx:
+    image: nginx:alpine
+    container_name: tms_nginx
+    depends_on:
+      - web_blue
+      - web_green
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - tms_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    entrypoint: >
+      sh -c "
+        # 生成SSL证书
+        if [ -f /etc/nginx/ssl/generate_certs.sh ]; then
+          chmod +x /etc/nginx/ssl/generate_certs.sh
+          /etc/nginx/ssl/generate_certs.sh
+        fi
+        # 启动nginx
+        nginx -g 'daemon off;'
+      "
+
+  # Grafana监控服务
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tms_grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning 2>/dev/null || true
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Prometheus监控服务
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tms_prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml 2>/dev/null || true
+      - ./prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yml 2>/dev/null || true
+      - ./prometheus/alerts:/etc/prometheus/alerts 2>/dev/null || true
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Alertmanager告警服务
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: tms_alertmanager
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml 2>/dev/null || true
+    ports:
+      - "9093:9093"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # 数据库备份服务
+  db_backup:
+    image: postgres:15-alpine
+    container_name: tms_db_backup
+    depends_on:
+      db_master:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tms
+    volumes:
+      - postgres_backup_data:/backups
+    networks:
+      - tms_network
+    command: >
+      sh -c "
+        apk add --no-cache bash && 
+        mkdir -p /backups && 
+        while true; do 
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S) && 
+          pg_dump -h db_master -U postgres -d tms -F c > /backups/tms_backup_$TIMESTAMP.dump && 
+          echo 'Backup completed: tms_backup_$TIMESTAMP.dump' && 
+          # 保留最近7天的备份
+          find /backups -name '*.dump' -type f -mtime +7 -delete && 
+          sleep 3600; 
+        done
+      "
+    restart: unless-stopped
+
+  # PostgreSQL监控服务
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: tms_postgres_exporter
+    depends_on:
+      db_master:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@db_master:5432/tms?sslmode=disable
+    ports:
+      - "9187:9187"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Redis监控服务
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: tms_redis_exporter
+    depends_on:
+      redis-cluster-init:
+        condition: service_completed_successfully
+    command:
+      - --redis.addr=redis://redis-master-1:6379
+      - --redis.addr=redis://redis-master-2:6379
+      - --redis.addr=redis://redis-master-3:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # 主机监控服务
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: tms_node_exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.rootfs=/rootfs
+      - --path.sysfs=/host/sys
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    ports:
+      - "9100:9100"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Docker容器监控服务
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: tms_cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+# 定义网络
+networks:
+  tms_network:
+    driver: bridge
+
+# 定义卷
+volumes:
+  postgres_master_data:
+    driver: local
+  postgres_slave_data:
+    driver: local
+  postgres_backup_data:
+    driver: local
+  redis_master_1_data:
+    driver: local
+  redis_master_2_data:
+    driver: local
+  redis_master_3_data:
+    driver: local
+  redis_slave_1_data:
+    driver: local
+  redis_slave_2_data:
+    driver: local
+  redis_slave_3_data:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
+
+

@@ -1,0 +1,173 @@
+﻿# Prometheus配置文件
+# 支持微服务架构监控
+
+global:
+  scrape_interval: 15s  # 抓取间隔
+  evaluation_interval: 15s  # 评估间隔
+  external_labels:
+    cluster: 'carptms'
+    replica: '{{.ExternalURL}}'
+
+# 规则文件配置
+rule_files:
+  - "alerts/microservices.yml"
+  - "alerts/infrastructure.yml"
+  - "alerts/business.yml"
+
+# 监控目标配置
+scrape_configs:
+  # 监控Prometheus自身
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"
+          tier: "monitoring"
+
+  # 监控TMS微服务 - 服务发现配置
+  - job_name: "tms_microservices"
+    file_sd_configs:
+      - files:
+          - 'targets/microservices.json'
+        refresh_interval: 30s
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: [service_name]
+        target_label: service
+
+  # 监控各个微服务（静态配置）
+  - job_name: "jt808-gateway"
+    static_configs:
+      - targets: ["localhost:9000"]
+        labels:
+          service: "jt808-gateway"
+          context: "gateway"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+
+  - job_name: "truck-scale-svc"
+    static_configs:
+      - targets: ["localhost:9001"]
+        labels:
+          service: "truck-scale-svc"
+          context: "weighing"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+
+  - job_name: "video-svc"
+    static_configs:
+      - targets: ["localhost:9002"]
+        labels:
+          service: "video-svc"
+          context: "video"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+
+  - job_name: "location-svc"
+    static_configs:
+      - targets: ["localhost:9003"]
+        labels:
+          service: "location-svc"
+          context: "location"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+
+  - job_name: "alarm-svc"
+    static_configs:
+      - targets: ["localhost:9004"]
+        labels:
+          service: "alarm-svc"
+          context: "alerts"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+
+  # 监控TMS应用 - 蓝色环境（遗留）
+  - job_name: "tms_server_blue"
+    static_configs:
+      - targets: ["web_blue:8080"]
+        labels:
+          environment: "blue"
+          deployment: "legacy"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # 监控TMS应用 - 绿色环境（遗留）
+  - job_name: "tms_server_green"
+    static_configs:
+      - targets: ["web_green:8080"]
+        labels:
+          environment: "green"
+          deployment: "legacy"
+    metrics_path: /api/metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # 监控Nginx负载均衡器
+  - job_name: "nginx"
+    static_configs:
+      - targets: ["nginx:80"]
+        labels:
+          service: "nginx"
+          tier: "loadbalancer"
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # 监控Grafana
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+        labels:
+          service: "grafana"
+          tier: "monitoring"
+    metrics_path: /metrics
+
+  # 监控PostgreSQL
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "postgresql"
+          tier: "database"
+    scrape_interval: 10s
+
+  # 监控Redis
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: "redis"
+          tier: "cache"
+    scrape_interval: 10s
+
+  # 监控Node Exporter（主机监控）
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          service: "node-exporter"
+          tier: "infrastructure"
+    scrape_interval: 10s
+
+  # 监控Docker容器
+  - job_name: "docker"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          service: "cadvisor"
+          tier: "infrastructure"
+    scrape_interval: 15s
+
+# Alertmanager配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      scheme: http
+      path_prefix: /
+      timeout: 10s
+      api_version: v2

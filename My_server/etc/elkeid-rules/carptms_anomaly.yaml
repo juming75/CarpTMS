@@ -1,0 +1,194 @@
+# CarpTMS 异常检测规则
+# 版本: 1.0
+# 日期: 2026-04-29
+
+anomaly:
+  # ==========================
+  # 统计基线异常检测
+  # ==========================
+  
+  statistical:
+    - name: api_latency_spike
+      description: API 响应延迟突然激增
+      field: api_latency
+      method: three_sigma
+      window: 5m
+      severity: warning
+    
+    - name: error_rate_spike
+      description: 错误率突然增加
+      field: error_rate
+      method: three_sigma
+      window: 5m
+      severity: high
+    
+    - name: request_count_spike
+      description: 请求数异常增加
+      field: request_count
+      method: percentile
+      threshold: 99
+      window: 10m
+      severity: warning
+
+  # ==========================
+  # 异常场景规则
+  # ==========================
+  
+  scenarios:
+    - id: CARPTMS_LOGIN_BRUTE_FORCE
+      name: 暴力破解检测
+      description: 短时间内连续登录失败
+      enable: true
+      severity: critical
+      tags:
+        - authentication
+        - brute-force
+      
+      condition: |
+        field.event_type == "login"
+        AND field.status == "failed"
+        AND consecutive(field.user_id, field.username) > 10
+        AND within: 5m
+      
+      action:
+        - type: alert
+        - type: block
+        - type: notify_admin
+      
+      block_config:
+        duration: 30m
+        type: ip_user
+
+    - id: CARPTMS_PERMISSION_DENIED_SPAM
+      name: 越权访问尝试
+      description: 短时间内多次权限拒绝
+      enable: true
+      severity: high
+      tags:
+        - permission
+        - attack
+      
+      condition: |
+        field.event_type == "permission_denied"
+        AND count(field.user_id) > 5
+        AND within: 10m
+      
+      action:
+        - type: alert
+        - type: audit
+        - type: mfa_required
+
+    - id: CARPTMS_TOKEN_TAMPERING
+      name: JWT 令牌异常
+      description: 大量过期或篡改 Token 尝试
+      enable: true
+      severity: critical
+      tags:
+        - authentication
+        - jwt
+      
+      condition: |
+        field.log_type == "application"
+        AND field.type == "auth_error"
+        AND field.reason IN ("token_expired", "token_invalid", "signature_mismatch")
+        AND count(field.user_id, field.ip_address) > 20
+        AND within: 5m
+      
+      action:
+        - type: alert
+        - type: block
+        - type: notify_admin
+
+    - id: CARPTMS_SENSITIVE_DATA_QUERY
+      name: 敏感数据异常查询
+      description: 短时间内多次查询敏感表
+      enable: true
+      severity: warning
+      tags:
+        - data
+        - sensitive
+      
+      condition: |
+        field.event_type == "data_query"
+        AND field.resource_name IN ("user_card", "payment_info", "driver_id_card")
+        AND count(field.user_id) > 3
+        AND within: 1h
+        AND field.user_role != "admin"
+      
+      action:
+        - type: alert
+        - type: audit
+
+    - id: CARPTMS_WEBSOCKET_ABNORMAL
+      name: WebSocket 连接异常
+      description: WebSocket 频繁断开重连或异常数据包
+      enable: true
+      severity: warning
+      tags:
+        - websocket
+        - network
+      
+      condition: |
+        field.log_type == "application"
+        AND field.type == "websocket"
+        AND field.status == "error"
+        AND count(field.ip_address) > 10
+        AND within: 5m
+      
+      action:
+        - type: alert
+
+    - id: CARPTMS_BUSINESS_HOUR_ANOMALY
+      name: 非工作时段业务操作
+      description: 非工作时段（如周末或节假日）执行关键业务操作
+      enable: true
+      severity: warning
+      tags:
+        - business
+        - time
+      
+      condition: |
+        field.event_type IN ("price_change", "waybill_modify", "payment_process")
+        AND (
+             (field.day_of_week IN ("Saturday", "Sunday")) 
+             OR 
+             (field.is_holiday == true)
+        )
+      
+      action:
+        - type: alert
+        - type: audit
+
+  # ==========================
+  # 基线数据定义
+  # ==========================
+  
+  baselines:
+    # 用户登录时间基线
+    - name: login_time_normal
+      description: 用户通常的登录时间范围
+      user_specific: true
+      field: hour
+      range:
+        min: 8
+        max: 20
+      deviation_alert: 3
+    
+    # API 调用频率基线
+    - name: api_rate_normal
+      description: 用户平均 API 调用频率
+      user_specific: true
+      field: request_count
+      thresholds:
+        per_minute: 50
+        per_hour: 1000
+        per_day: 5000
+    
+    # 敏感数据访问频率
+    - name: sensitive_access_rate
+      description: 用户敏感数据访问频率限制
+      resource_specific: true
+      field: access_count
+      thresholds:
+        per_hour: 10
+        per_day: 50

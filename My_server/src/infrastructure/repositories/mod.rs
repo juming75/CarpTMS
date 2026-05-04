@@ -1,0 +1,19 @@
+//! / 基础设施层仓库实现
+
+pub mod audit_log_repository;
+pub mod auth_repository;
+pub mod calibration_repository;
+pub mod department_repository;
+pub mod device_repository;
+pub mod driver_repository;
+pub mod finance_repository;
+pub mod location_repository;
+pub mod openapi_platform_repository;
+pub mod order_repository;
+pub mod organization_repository;
+pub mod statistic_repository;
+pub mod statistics_repository;
+pub mod user_repository;
+pub mod vehicle_group_repository;
+pub mod vehicle_repository;
+pub mod weighing_data_repository;

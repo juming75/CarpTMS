@@ -1,0 +1,297 @@
+# CarpTMS 安全配置
+# 等保三级安全配置
+
+# ============================================
+# 安全级别配置
+# ============================================
+[security]
+# 安全级别: low, medium, high, critical
+level = "high"
+
+# 生产环境强制启用
+production_enforce = true
+
+# ============================================
+# Cookie 安全配置
+# ============================================
+[cookie]
+# 访问令牌 Cookie
+[cookie.access_token]
+name = "access_token"
+http_only = true
+secure = true
+same_site = "lax"
+max_age_hours = 24
+path = "/"
+domain = ""
+
+# 刷新令牌 Cookie
+[cookie.refresh_token]
+name = "refresh_token"
+http_only = true
+secure = true
+same_site = "lax"
+max_age_days = 7
+path = "/"
+domain = ""
+
+# 认证检查 Cookie (非 HttpOnly，用于前端判断登录状态)
+[cookie.auth_check]
+name = "auth_check"
+http_only = false
+secure = true
+same_site = "lax"
+max_age_hours = 1
+path = "/"
+
+# CSRF Token Cookie
+[cookie.csrf_token]
+name = "csrf_token"
+http_only = true
+secure = true
+same_site = "strict"
+max_age_hours = 24
+path = "/"
+
+# ============================================
+# JWT 配置
+# ============================================
+[jwt]
+# 访问令牌过期时间（秒）
+access_token_expires = 86400  # 24小时
+
+# 刷新令牌过期时间（秒）
+refresh_token_expires = 604800  # 7天
+
+# 令牌刷新提前时间（秒）
+refresh_threshold = 300  # 提前5分钟刷新
+
+# 启用 JWT 黑名单
+enable_blacklist = true
+
+# 黑名单检查是否强制（生产环境必须为 true）
+blacklist_strict = true
+
+# ============================================
+# 密码策略
+# ============================================
+[password]
+min_length = 8
+max_length = 128
+require_uppercase = true
+require_lowercase = true
+require_digit = true
+require_special = true
+
+# 密码历史（不能重复使用最近 N 次的密码）
+history_count = 5
+
+# 密码过期天数（0 表示不过期）
+expire_days = 90
+
+# 登录失败锁定
+[password.lockout]
+enabled = true
+max_attempts = 5
+lockout_duration_minutes = 30
+
+# ============================================
+# 会话管理
+# ============================================
+[session]
+# 会话超时（秒）
+timeout = 3600  # 1小时
+
+# 最大并发会话数（0 表示不限制）
+max_concurrent = 0
+
+# 会话固定保护
+fixation_protection = true
+
+# ============================================
+# 审计日志配置
+# ============================================
+[audit]
+enabled = true
+
+# 日志级别: debug, info, warning, error, critical
+level = "info"
+
+# 日志保留天数
+retention_days = 180  # 等保三级要求至少6个月
+
+# 需要记录的操作
+[audit.events]
+login = true
+logout = true
+password_change = true
+permission_change = true
+sensitive_data_access = true
+data_modification = true
+failed_auth = true
+admin_action = true
+
+# ============================================
+# CSRF 保护
+# ============================================
+[csrf]
+enabled = true
+
+# CSRF 令牌生命周期（秒）
+token_lifetime = 86400  # 24小时
+
+# 需要 CSRF 保护的 HTTP 方法
+protected_methods = ["POST", "PUT", "DELETE", "PATCH"]
+
+# ============================================
+# 速率限制
+# ============================================
+[rate_limit]
+enabled = true
+
+# 认证相关接口
+[rate_limit.auth]
+requests_per_minute = 10
+burst = 20
+
+# 通用 API
+[rate_limit.api]
+requests_per_minute = 60
+burst = 100
+
+# 搜索/查询接口
+[rate_limit.query]
+requests_per_minute = 30
+burst = 50
+
+# 文件上传
+[rate_limit.upload]
+requests_per_minute = 10
+burst = 5
+
+# ============================================
+# 安全头
+# ============================================
+[security_headers]
+# 是否启用安全头
+enabled = true
+
+# Strict-Transport-Security (秒)
+hsts_max_age = 31536000  # 1年
+
+# X-Content-Type-Options
+x_content_type_options = "nosniff"
+
+# X-Frame-Options
+x_frame_options = "DENY"
+
+# X-XSS-Protection
+x_xss_protection = "1; mode=block"
+
+# Referrer-Policy
+referrer_policy = "strict-origin-when-cross-origin"
+
+# Content-Security-Policy (可根据需要调整)
+content_security_policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https:; frame-ancestors 'none';"
+
+# ============================================
+# CORS 配置
+# ============================================
+[cors]
+enabled = true
+
+# 允许的来源（生产环境应限制具体域名）
+allowed_origins = [
+    "https://carptms.example.com",
+    "https://www.carptms.example.com"
+]
+
+# 允许的方法
+allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+
+# 允许的头部
+allowed_headers = ["Content-Type", "Authorization", "X-CSRF-Token", "X-Requested-With"]
+
+# 暴露的头部
+exposed_headers = ["X-Total-Count", "X-Page-Count"]
+
+# 是否允许携带凭证
+allow_credentials = true
+
+# 预检请求缓存时间（秒）
+max_age = 3600
+
+# ============================================
+# API 安全
+# ============================================
+[api]
+# 是否强制 HTTPS
+force_https = true
+
+# 是否禁止 TRACE 方法
+disable_trace = true
+
+# 是否禁止 TRACK 方法
+disable_track = true
+
+# 请求体最大大小（字节）
+max_body_size = 10485760  # 10MB
+
+# 请求超时（秒）
+request_timeout = 30
+
+# ============================================
+# 数据库安全
+# ============================================
+[database]
+# 是否启用 SQL 注入防护
+sql_injection_protection = true
+
+# 是否启用查询日志（审计用）
+query_logging = true
+
+# 是否加密敏感字段
+encrypt_sensitive_fields = true
+
+# 敏感字段列表
+sensitive_fields = [
+    "password",
+    "salt",
+    "secret_key",
+    "private_key",
+    "token",
+    "access_token",
+    "refresh_token"
+]
+
+# ============================================
+# 日志安全
+# ============================================
+[logging]
+# 是否掩码敏感数据
+mask_sensitive_data = true
+
+# 日志中要掩码的字段
+masked_fields = [
+    "password",
+    "token",
+    "secret",
+    "key",
+    "authorization",
+    "cookie",
+    "access_token",
+    "refresh_token"
+]
+
+# ============================================
+# 备份安全
+# ============================================
+[backup]
+# 备份加密
+encrypted = true
+
+# 备份保留份数
+retention_copies = 7
+
+# 备份传输加密
+transport_encrypted = true

@@ -1,0 +1,165 @@
+# Kubernetes Helm Chart 配置
+# PostgreSQL 读写分离集群
+
+replicaCount: 3
+
+image:
+  repository: postgres
+  tag: "15-alpine"
+  pullPolicy: IfNotPresent
+
+# PostgreSQL 主库配置
+primary:
+  name: primary
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: fast-ssd
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  configuration:
+    maxConnections: 500
+    sharedBuffers: 256MB
+    effectiveCacheSize: 1GB
+    maintenanceWorkMem: 64MB
+    checkpointCompletionTarget: 0.9
+    walBuffers: 16MB
+    defaultStatisticsTarget: 100
+    randomPageCost: 1.1
+    workMem: 4MB
+    minWalSize: 1GB
+    maxWalSize: 4GB
+    walLevel: replica
+    maxWalSenders: 10
+    hotStandby: "on"
+    maxReplicationSlots: 10
+
+# PostgreSQL 从库配置
+readReplicas:
+  replicaCount: 2
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: fast-ssd
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  configuration:
+    maxConnections: 500
+    sharedBuffers: 256MB
+    effectiveCacheSize: 2GB
+    hotStandby: "on"
+
+# 服务配置
+service:
+  primary:
+    type: ClusterIP
+    port: 5432
+  replica:
+    type: ClusterIP
+    port: 5432
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# 备份配置
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  s3:
+    enabled: true
+    bucket: carptms-db-backups
+    region: cn-north-1
+
+# 监控配置
+metrics:
+  enabled: true
+  image:
+    repository: prometheuscommunity/postgresql-exporter
+    tag: v0.15.0
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Pod 自动扩缩容
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod 安全策略
+podSecurityContext:
+  fsGroup: 1001
+  runAsUser: 1001
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - IPC_LOCK
+      - SYS_NICE
+
+# 探针配置
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# 网络策略
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: carptms
+      ports:
+        - port: 5432
+
+# 拓扑分布
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/component: postgresql
+
+# 初始化脚本
+initdbScripts:
+  01-init.sql: |
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+    CREATE EXTENSION IF NOT EXISTS "pg_repack";
+    
+    -- 性能优化
+    ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements,uuid-ossp';
+    SELECT pg_reload_conf();

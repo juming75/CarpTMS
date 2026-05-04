@@ -1,0 +1,70 @@
+# ==============================================================================
+# CarpTMS 生产环境 Dockerfile
+# ==============================================================================
+
+# 构建阶段
+FROM rust:1.94-slim-bullseye AS builder
+
+# 设置工作目录
+WORKDIR /app
+
+# 更新系统并安装依赖
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制 Cargo 文件
+COPY Cargo.toml Cargo.lock ./
+
+# 构建依赖缓存层
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -f target/release/deps/carptms*
+
+# 复制源代码
+COPY src ./src
+
+# 构建发布版本
+RUN cargo build --release
+
+# ==============================================================================
+# 运行阶段
+# ==============================================================================
+FROM debian:bullseye-slim
+
+# 设置工作目录
+WORKDIR /app
+
+# 更新系统并安装运行时依赖
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# 创建非特权用户
+RUN useradd -m -u 1000 carptms
+USER carptms
+
+# 从构建阶段复制二进制文件
+COPY --from=builder /app/target/release/carptms_server ./carptms_server
+COPY --from=builder /app/target/release/db_init ./db_init
+
+# 创建必要的目录
+RUN mkdir -p /home/carptms/logs /home/carptms/data
+
+# 设置环境变量
+ENV APP_ENV=production
+ENV RUST_LOG=info
+
+# 暴露端口
+EXPOSE 8082 8988 9808 9809
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8082/api/health/live || exit 1
+
+# 启动命令
+CMD ["./carptms_server"]

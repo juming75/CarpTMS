@@ -1,0 +1,405 @@
+# 微服务架构 Docker Compose 配置
+version: '3.8'
+
+services:
+  # ==========================================
+  # 基础设施服务
+  # ==========================================
+  
+  # PostgreSQL主数据库
+  db_master:
+    image: postgres:15-alpine
+    container_name: tms_db_master
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tms
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_master_data:/var/lib/postgresql/data
+    networks:
+      - tms_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis集群
+  redis-master:
+    image: redis:7-alpine
+    container_name: tms_redis_master
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - tms_network
+    command: redis-server --appendonly yes
+
+  # ==========================================
+  # 微服务层
+  # ==========================================
+
+  # 车辆服务
+  vehicle-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-vehicle-service:latest
+    container_name: tms_vehicle_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: vehicle-service
+      PORT: 8083
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8083:8083"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 货物服务
+  cargo-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-cargo-service:latest
+    container_name: tms_cargo_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: cargo-service
+      PORT: 8084
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8084:8084"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 行程服务
+  trip-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-trip-service:latest
+    container_name: tms_trip_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: trip-service
+      PORT: 8085
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8085:8085"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 计费服务
+  billing-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-billing-service:latest
+    container_name: tms_billing_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: billing-service
+      PORT: 8086
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8086:8086"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 用户服务
+  user-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-user-service:latest
+    container_name: tms_user_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: user-service
+      PORT: 8087
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8087:8087"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 设备服务
+  device-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-device-service:latest
+    container_name: tms_device_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: device-service
+      PORT: 8088
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8088:8088"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 财务服务
+  finance-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-finance-service:latest
+    container_name: tms_finance_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: finance-service
+      PORT: 8089
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8089:8089"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 位置服务
+  location-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-location-service:latest
+    container_name: tms_location_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: location-service
+      PORT: 8090
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8090:8090"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 称重服务
+  weighing-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-weighing-service:latest
+    container_name: tms_weighing_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: weighing-service
+      PORT: 8091
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8091:8091"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # 告警服务
+  alerts-service:
+    image: ${DOCKERHUB_USERNAME}/carptms-alerts-service:latest
+    container_name: tms_alerts_service
+    depends_on:
+      db_master:
+        condition: service_healthy
+      redis-master:
+        condition: service_started
+    environment:
+      SERVICE_NAME: alerts-service
+      PORT: 8092
+      DATABASE_URL: postgres://postgres:postgres@db_master:5432/tms
+      REDIS_URL: redis://redis-master:6379
+      ARCHITECTURE_MODE: micro_ddd
+    ports:
+      - "8092:8092"
+    networks:
+      - tms_network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # ==========================================
+  # 网关层
+  # ==========================================
+
+  # Nginx API 网关
+  nginx-gateway:
+    image: nginx:alpine
+    container_name: tms_nginx_gateway
+    depends_on:
+      - vehicle-service
+      - cargo-service
+      - trip-service
+      - billing-service
+      - user-service
+      - device-service
+      - finance-service
+      - location-service
+      - weighing-service
+      - alerts-service
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/proxy_params.conf:/etc/nginx/conf.d/proxy_params.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # ==========================================
+  # 监控层
+  # ==========================================
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: tms_prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerts:/etc/prometheus/alerts
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: tms_grafana
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: tms_alertmanager
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    networks:
+      - tms_network
+    restart: unless-stopped
+
+# 网络定义
+networks:
+  tms_network:
+    driver: bridge
+
+# 卷定义
+volumes:
+  postgres_master_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
